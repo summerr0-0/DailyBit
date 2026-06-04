@@ -1,4 +1,6 @@
 import { Suspense } from "react";
+
+export const dynamic = "force-dynamic";
 import { BitList } from "@/components/bits/BitList";
 
 export default function HomePage() {
