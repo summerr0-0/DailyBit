@@ -1,0 +1,38 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /Users/jeong-ilin/study/dailybit && pnpm tsc --noEmit 2>&1 | head -20"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file=$(echo '$TOOL_INPUT' | jq -r '.file_path // empty'); if [[ \"$file\" == *\".env\"* && \"$file\" != *\".env.example\"* ]]; then echo 'BLOCKED: direct .env edit is not allowed. Use .env.example and set values manually.'; exit 1; fi"
+          },
+          {
+            "type": "command",
+            "command": "file=$(echo '$TOOL_INPUT' | jq -r '.file_path // empty'); if [[ \"$file\" == *\"pnpm-lock.yaml\"* ]]; then echo 'BLOCKED: do not edit pnpm-lock.yaml manually. Run pnpm install instead.'; exit 1; fi"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(pnpm *)",
+      "Bash(prisma *)",
+      "Bash(git *)",
+      "Bash(tsc *)"
+    ]
+  }
+}
