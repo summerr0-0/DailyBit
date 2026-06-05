@@ -28,6 +28,18 @@ function toRelativeLabel(date: Date): string {
   return formatter.format(-Math.floor(diffMin / 1440), "day");
 }
 
+type BitRow = {
+  id: string;
+  content: string;
+  tags: string[];
+  createdAt: Date;
+  author: { id: string; nickname: string; image: string | null };
+};
+
+function toBitWithAuthor({ createdAt, ...rest }: BitRow): BitWithAuthor {
+  return { ...rest, createdAtLabel: toRelativeLabel(createdAt) };
+}
+
 export async function getBits(): Promise<BitWithAuthor[]> {
   const rows = await prisma.bit.findMany({
     orderBy: { createdAt: "desc" },
@@ -42,10 +54,29 @@ export async function getBits(): Promise<BitWithAuthor[]> {
     },
   });
 
-  return rows.map((row) => ({
-    ...row,
-    createdAtLabel: toRelativeLabel(row.createdAt),
-  }));
+  return rows.map(toBitWithAuthor);
+}
+
+/**
+ * 특정 태그가 달린 Bit를 최신순으로 조회한다.
+ * 태그는 소문자로 정규화되어 저장되므로 입력도 소문자화해 매칭한다.
+ */
+export async function getBitsByTag(tag: string): Promise<BitWithAuthor[]> {
+  const rows = await prisma.bit.findMany({
+    where: { tags: { has: tag.toLowerCase() } },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      content: true,
+      tags: true,
+      createdAt: true,
+      author: {
+        select: { id: true, nickname: true, image: true },
+      },
+    },
+  });
+
+  return rows.map(toBitWithAuthor);
 }
 
 /**
@@ -78,8 +109,5 @@ export async function createBit(input: { content: string }): Promise<BitWithAuth
     },
   });
 
-  return {
-    ...row,
-    createdAtLabel: toRelativeLabel(row.createdAt),
-  };
+  return toBitWithAuthor(row);
 }

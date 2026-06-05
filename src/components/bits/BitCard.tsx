@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { BitWithAuthor } from "@/lib/bits";
 
 type Props = { bit: BitWithAuthor };
@@ -13,9 +14,13 @@ export function BitCard({ bit }: Props) {
       {bit.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-2">
           {bit.tags.map((tag) => (
-            <span key={tag} className="text-xs text-blue-500">
+            <Link
+              key={tag}
+              href={`/tags/${tag}`}
+              className="text-xs text-blue-500 hover:underline"
+            >
               #{tag}
-            </span>
+            </Link>
           ))}
         </div>
       )}
