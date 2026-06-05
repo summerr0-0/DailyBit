@@ -1,7 +1,8 @@
 import { Suspense } from "react";
+import { BitList } from "@/components/bits/BitList";
+import { BitComposer } from "@/components/bits/BitComposer";
 
 export const dynamic = "force-dynamic";
-import { BitList } from "@/components/bits/BitList";
 
 export default function HomePage() {
   return (
@@ -9,6 +10,7 @@ export default function HomePage() {
       <header className="sticky top-0 bg-background/80 backdrop-blur border-b border-border px-4 py-3">
         <h1 className="font-bold text-lg">DailyBit</h1>
       </header>
+      <BitComposer />
       <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">로딩 중...</div>}>
         <BitList />
       </Suspense>
