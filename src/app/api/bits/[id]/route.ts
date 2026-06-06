@@ -19,7 +19,8 @@ export async function DELETE(
       );
     }
     return new NextResponse(null, { status: 204 });
-  } catch {
+  } catch (error) {
+    console.error(`Bit 삭제 실패 (id=${id}):`, error);
     return NextResponse.json(
       { error: "Bit 삭제에 실패했습니다." },
       { status: 500 },
