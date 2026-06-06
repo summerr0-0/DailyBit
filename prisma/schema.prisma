@@ -17,6 +17,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   bits      Bit[]
+  rebits    Rebit[]
 
   @@map("users")
 }
@@ -30,5 +31,20 @@ model Bit {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  rebits    Rebit[]
+
   @@map("bits")
+}
+
+model Rebit {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bitId     String
+  bit       Bit      @relation(fields: [bitId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, bitId])
+  @@index([bitId])
+  @@map("rebits")
 }

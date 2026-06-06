@@ -1,11 +1,24 @@
 import { prisma } from "@/lib/prisma";
 import { parseTags } from "@/lib/tags";
 
-// auth 도입 전까지 모든 Bit는 이 고정 dev 유저로 귀속된다 (spec: bit-compose D1).
-const DEV_USER = {
+// auth 도입 전까지 모든 Bit·Rebit는 이 고정 dev 유저로 귀속된다 (spec: bit-compose D1).
+export const DEV_USER = {
   email: "dev@dailybit.dev",
   nickname: "devuser",
 } as const;
+
+/**
+ * 고정 dev 유저를 email 기준 upsert로 확보한다 (시드 실행 여부와 무관, 프로덕션 안전).
+ * Bit 작성·Rebit 등 쓰기 주체가 공유한다.
+ */
+export async function ensureDevUser(): Promise<{ id: string }> {
+  return prisma.user.upsert({
+    where: { email: DEV_USER.email },
+    update: {},
+    create: { email: DEV_USER.email, nickname: DEV_USER.nickname },
+    select: { id: true },
+  });
+}
 
 export type BitWithAuthor = {
   id: string;
@@ -21,7 +34,7 @@ export type BitWithAuthor = {
 
 const formatter = new Intl.RelativeTimeFormat("ko", { numeric: "auto" });
 
-function toRelativeLabel(date: Date): string {
+export function toRelativeLabel(date: Date): string {
   const diffMin = Math.floor((Date.now() - date.getTime()) / 60000);
   if (diffMin < 60) return formatter.format(-diffMin, "minute");
   if (diffMin < 1440) return formatter.format(-Math.floor(diffMin / 60), "hour");
@@ -85,12 +98,7 @@ export async function getBitsByTag(tag: string): Promise<BitWithAuthor[]> {
  * - 태그는 본문에서 파싱·정규화한다 (parseTags).
  */
 export async function createBit(input: { content: string }): Promise<BitWithAuthor> {
-  const author = await prisma.user.upsert({
-    where: { email: DEV_USER.email },
-    update: {},
-    create: { email: DEV_USER.email, nickname: DEV_USER.nickname },
-    select: { id: true },
-  });
+  const author = await ensureDevUser();
 
   const row = await prisma.bit.create({
     data: {

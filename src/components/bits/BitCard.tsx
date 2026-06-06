@@ -2,8 +2,12 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { TAG_PATTERN } from "@/lib/tags";
 import type { BitWithAuthor } from "@/lib/bits";
+import { RebitButton } from "./RebitButton";
 
-type Props = { bit: BitWithAuthor };
+type Props = {
+  bit: BitWithAuthor;
+  rebit?: { count: number; byMe: boolean };
+};
 
 /**
  * 본문을 #태그 경계로 분할해 렌더한다.
@@ -37,7 +41,7 @@ function renderContent(content: string): ReactNode[] {
   return nodes;
 }
 
-export function BitCard({ bit }: Props) {
+export function BitCard({ bit, rebit }: Props) {
   return (
     <article className="border-b border-border px-4 py-3">
       <div className="flex items-center gap-2 mb-1">
@@ -45,6 +49,11 @@ export function BitCard({ bit }: Props) {
         <span className="text-muted-foreground text-xs">{bit.createdAtLabel}</span>
       </div>
       <p className="text-sm leading-relaxed">{renderContent(bit.content)}</p>
+      {rebit && (
+        <div className="flex">
+          <RebitButton bitId={bit.id} count={rebit.count} active={rebit.byMe} />
+        </div>
+      )}
     </article>
   );
 }
