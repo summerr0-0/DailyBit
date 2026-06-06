@@ -1,5 +1,6 @@
 import { getBits } from "@/lib/bits";
 import { BitCard } from "./BitCard";
+import { DeleteBitButton } from "./DeleteBitButton";
 
 export async function BitList() {
   const bits = await getBits();
@@ -15,7 +16,12 @@ export async function BitList() {
   return (
     <div>
       {bits.map((bit) => (
-        <BitCard key={bit.id} bit={bit} />
+        <div key={bit.id} className="group relative">
+          <BitCard bit={bit} />
+          <div className="absolute right-3 top-3 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+            <DeleteBitButton bitId={bit.id} />
+          </div>
+        </div>
       ))}
     </div>
   );
