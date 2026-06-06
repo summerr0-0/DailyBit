@@ -1,4 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import { parseTags } from "@/lib/tags";
+
+// auth 도입 전까지 모든 Bit는 이 고정 dev 유저로 귀속된다 (spec: bit-compose D1).
+const DEV_USER = {
+  email: "dev@dailybit.dev",
+  nickname: "devuser",
+} as const;
 
 export type BitWithAuthor = {
   id: string;
@@ -21,6 +28,18 @@ function toRelativeLabel(date: Date): string {
   return formatter.format(-Math.floor(diffMin / 1440), "day");
 }
 
+type BitRow = {
+  id: string;
+  content: string;
+  tags: string[];
+  createdAt: Date;
+  author: { id: string; nickname: string; image: string | null };
+};
+
+function toBitWithAuthor({ createdAt, ...rest }: BitRow): BitWithAuthor {
+  return { ...rest, createdAtLabel: toRelativeLabel(createdAt) };
+}
+
 export async function getBits(): Promise<BitWithAuthor[]> {
   const rows = await prisma.bit.findMany({
     orderBy: { createdAt: "desc" },
@@ -35,8 +54,60 @@ export async function getBits(): Promise<BitWithAuthor[]> {
     },
   });
 
-  return rows.map((row) => ({
-    ...row,
-    createdAtLabel: toRelativeLabel(row.createdAt),
-  }));
+  return rows.map(toBitWithAuthor);
+}
+
+/**
+ * 특정 태그가 달린 Bit를 최신순으로 조회한다.
+ * 태그는 소문자로 정규화되어 저장되므로 입력도 소문자화해 매칭한다.
+ */
+export async function getBitsByTag(tag: string): Promise<BitWithAuthor[]> {
+  const rows = await prisma.bit.findMany({
+    where: { tags: { has: tag.toLowerCase() } },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      content: true,
+      tags: true,
+      createdAt: true,
+      author: {
+        select: { id: true, nickname: true, image: true },
+      },
+    },
+  });
+
+  return rows.map(toBitWithAuthor);
+}
+
+/**
+ * 새 Bit를 생성한다.
+ * - 작성자는 고정 dev 유저를 email 기준 upsert로 확보 (시드 실행 여부와 무관, 프로덕션 안전).
+ * - 태그는 본문에서 파싱·정규화한다 (parseTags).
+ */
+export async function createBit(input: { content: string }): Promise<BitWithAuthor> {
+  const author = await prisma.user.upsert({
+    where: { email: DEV_USER.email },
+    update: {},
+    create: { email: DEV_USER.email, nickname: DEV_USER.nickname },
+    select: { id: true },
+  });
+
+  const row = await prisma.bit.create({
+    data: {
+      content: input.content,
+      tags: parseTags(input.content),
+      authorId: author.id,
+    },
+    select: {
+      id: true,
+      content: true,
+      tags: true,
+      createdAt: true,
+      author: {
+        select: { id: true, nickname: true, image: true },
+      },
+    },
+  });
+
+  return toBitWithAuthor(row);
 }
