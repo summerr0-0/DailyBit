@@ -32,6 +32,14 @@ describe("BitCard", () => {
     expect(screen.getByText("#dailybit")).toBeInTheDocument();
   });
 
+  it("태그는 /tags/<tag> 링크다", () => {
+    render(<BitCard bit={mockBit} />);
+    expect(screen.getByRole("link", { name: "#test" })).toHaveAttribute(
+      "href",
+      "/tags/test",
+    );
+  });
+
   it("상대 시간 레이블을 보여준다", () => {
     render(<BitCard bit={mockBit} />);
     expect(screen.getByText("방금 전")).toBeInTheDocument();
