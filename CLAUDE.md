@@ -24,6 +24,7 @@ docs/             architecture & domain details
 - App Router only (no pages/) → `.claude/rules/app-router-only.md`
 - Server Component default → `.claude/rules/server-component-first.md`
 - Prisma schema owns DB → `.claude/rules/prisma-schema-authority.md`
+- Docs stay in-repo, not Obsidian → `.claude/rules/in-repo-docs.md`
 
 ## Project Skills
 
