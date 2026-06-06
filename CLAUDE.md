@@ -32,6 +32,7 @@ docs/             architecture & domain details
 | `/migrate` | Prisma migration + client regenerate |
 | `/seed` | Load dev seed data |
 | `/new-feature` | Start today's feature build cycle |
+| `/gemini-review` | Cross-verify spec/diff/tests with Gemini CLI |
 
 ## Active Hooks
 
