@@ -1,6 +1,6 @@
 import { getFeed } from "@/lib/feed";
 import { BitCard } from "./BitCard";
-import { DeleteBitButton } from "./DeleteBitButton";
+import { BitActionsMenu } from "./BitActionsMenu";
 
 export async function BitList() {
   const items = await getFeed();
@@ -16,7 +16,7 @@ export async function BitList() {
   return (
     <div>
       {items.map((item) => (
-        <div key={item.key} className="group relative">
+        <div key={item.key} className="relative">
           {item.kind === "rebit" && (
             <p className="px-4 pt-2 text-xs text-muted-foreground">
               {item.rebitedBy}님이 Rebit함
@@ -26,8 +26,8 @@ export async function BitList() {
             bit={item.bit}
             rebit={{ count: item.rebitCount, byMe: item.rebitedByMe }}
           />
-          <div className="absolute right-3 top-3 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-            <DeleteBitButton bitId={item.bit.id} />
+          <div className="absolute right-3 top-3">
+            <BitActionsMenu bitId={item.bit.id} />
           </div>
         </div>
       ))}
