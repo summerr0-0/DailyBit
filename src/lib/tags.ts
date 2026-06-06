@@ -1,4 +1,6 @@
-const TAG_PATTERN = /#([\p{L}\p{N}_]+)/gu;
+// 본문 렌더(BitCard)와 태그 추출(parseTags)이 동일 규칙을 쓰도록 단일 출처로 공유한다.
+// g 플래그가 있어 lastIndex 부작용이 있으므로, 사용처에서 매번 새 RegExp를 만들거나 split/matchAll로 안전하게 쓴다.
+export const TAG_PATTERN = /#([\p{L}\p{N}_]+)/gu;
 const MAX_TAGS = 10;
 
 /**
