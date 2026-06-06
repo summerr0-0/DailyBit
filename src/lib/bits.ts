@@ -119,3 +119,14 @@ export async function createBit(input: { content: string }): Promise<BitWithAuth
 
   return toBitWithAuthor(row);
 }
+
+/**
+ * Bit를 id로 삭제한다.
+ * - deleteMany를 써서 대상이 없어도 예외 대신 count=0을 반환받는다.
+ * - 반환값은 실제 삭제 여부 (false면 호출부에서 404 처리).
+ * - 인증 도입 전이라 소유자 검증은 없다 (전부 DEV_USER 소유).
+ */
+export async function deleteBit(id: string): Promise<boolean> {
+  const { count } = await prisma.bit.deleteMany({ where: { id } });
+  return count > 0;
+}
