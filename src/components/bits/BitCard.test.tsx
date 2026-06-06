@@ -1,7 +1,11 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { BitCard } from "./BitCard";
 import type { BitWithAuthor } from "@/lib/bits";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
 
 const base: BitWithAuthor = {
   id: "test-1",
@@ -67,5 +71,15 @@ describe("BitCard", () => {
     // 본문엔 태그가 없고 tags 배열만 채워진 경우, 하단 칩 링크가 없어야 한다.
     render(<BitCard bit={bitWith("그냥 글", ["일상", "개발"])} />);
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("rebit props가 있으면 Rebit 버튼을 보여준다", () => {
+    render(<BitCard bit={base} rebit={{ count: 2, byMe: false }} />);
+    expect(screen.getByRole("button", { name: /Rebit/ })).toBeInTheDocument();
+  });
+
+  it("rebit props가 없으면 Rebit 버튼이 없다", () => {
+    render(<BitCard bit={base} />);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });
