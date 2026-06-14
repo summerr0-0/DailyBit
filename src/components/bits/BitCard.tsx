@@ -1,8 +1,14 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { TAG_PATTERN } from "@/lib/tags";
-import type { BitWithAuthor } from "@/lib/bits";
+import type { BitWithAuthor, AiCollabLevel } from "@/lib/bits";
 import { RebitButton } from "./RebitButton";
+
+const AI_COLLAB_LABEL: Record<AiCollabLevel, string | null> = {
+  NONE: null,
+  HINT: "AI 힌트",
+  LED: "AI 주도",
+};
 
 type Props = {
   bit: BitWithAuthor;
@@ -42,11 +48,28 @@ function renderContent(content: string): ReactNode[] {
 }
 
 export function BitCard({ bit, rebit }: Props) {
+  const aiLabel = AI_COLLAB_LABEL[bit.aiCollab];
+
   return (
     <article className="border-b border-border px-4 py-3">
+      {bit.thread && (
+        <div className="mb-1">
+          <Link
+            href={`/threads/${bit.thread.id}`}
+            className="text-xs text-blue-500 hover:underline"
+          >
+            {bit.thread.title}
+          </Link>
+        </div>
+      )}
       <div className="flex items-center gap-2 mb-1">
         <span className="font-semibold text-sm">{bit.author.nickname}</span>
         <span className="text-muted-foreground text-xs">{bit.createdAtLabel}</span>
+        {aiLabel && (
+          <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500">
+            {aiLabel}
+          </span>
+        )}
       </div>
       <p className="text-sm leading-relaxed">{renderContent(bit.content)}</p>
       {rebit && (

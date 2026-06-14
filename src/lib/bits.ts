@@ -20,10 +20,14 @@ export async function ensureDevUser(): Promise<{ id: string }> {
   });
 }
 
+export type AiCollabLevel = "NONE" | "HINT" | "LED";
+
 export type BitWithAuthor = {
   id: string;
   content: string;
   tags: string[];
+  aiCollab: AiCollabLevel;
+  thread: { id: string; title: string } | null;
   createdAtLabel: string;
   author: {
     id: string;
@@ -45,6 +49,8 @@ type BitRow = {
   id: string;
   content: string;
   tags: string[];
+  aiCollab: AiCollabLevel;
+  thread: { id: string; title: string } | null;
   createdAt: Date;
   author: { id: string; nickname: string; image: string | null };
 };
@@ -53,18 +59,20 @@ function toBitWithAuthor({ createdAt, ...rest }: BitRow): BitWithAuthor {
   return { ...rest, createdAtLabel: toRelativeLabel(createdAt) };
 }
 
+const BIT_SELECT = {
+  id: true,
+  content: true,
+  tags: true,
+  aiCollab: true,
+  createdAt: true,
+  author: { select: { id: true, nickname: true, image: true } },
+  thread: { select: { id: true, title: true } },
+} as const;
+
 export async function getBits(): Promise<BitWithAuthor[]> {
   const rows = await prisma.bit.findMany({
     orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      content: true,
-      tags: true,
-      createdAt: true,
-      author: {
-        select: { id: true, nickname: true, image: true },
-      },
-    },
+    select: BIT_SELECT,
   });
 
   return rows.map(toBitWithAuthor);
@@ -78,15 +86,7 @@ export async function getBitsByTag(tag: string): Promise<BitWithAuthor[]> {
   const rows = await prisma.bit.findMany({
     where: { tags: { has: tag.toLowerCase() } },
     orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      content: true,
-      tags: true,
-      createdAt: true,
-      author: {
-        select: { id: true, nickname: true, image: true },
-      },
-    },
+    select: BIT_SELECT,
   });
 
   return rows.map(toBitWithAuthor);
@@ -97,7 +97,11 @@ export async function getBitsByTag(tag: string): Promise<BitWithAuthor[]> {
  * - 작성자는 고정 dev 유저를 email 기준 upsert로 확보 (시드 실행 여부와 무관, 프로덕션 안전).
  * - 태그는 본문에서 파싱·정규화한다 (parseTags).
  */
-export async function createBit(input: { content: string }): Promise<BitWithAuthor> {
+export async function createBit(input: {
+  content: string;
+  threadId?: string;
+  aiCollab?: AiCollabLevel;
+}): Promise<BitWithAuthor> {
   const author = await ensureDevUser();
 
   const row = await prisma.bit.create({
@@ -105,16 +109,10 @@ export async function createBit(input: { content: string }): Promise<BitWithAuth
       content: input.content,
       tags: parseTags(input.content),
       authorId: author.id,
+      ...(input.threadId ? { threadId: input.threadId } : {}),
+      ...(input.aiCollab ? { aiCollab: input.aiCollab } : {}),
     },
-    select: {
-      id: true,
-      content: true,
-      tags: true,
-      createdAt: true,
-      author: {
-        select: { id: true, nickname: true, image: true },
-      },
-    },
+    select: BIT_SELECT,
   });
 
   return toBitWithAuthor(row);

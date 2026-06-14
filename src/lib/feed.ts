@@ -20,6 +20,8 @@ type BitForFeed = {
   id: string;
   content: string;
   tags: string[];
+  aiCollab: "NONE" | "HINT" | "LED";
+  thread: { id: string; title: string } | null;
   createdAt: Date;
   author: { id: string; nickname: string; image: string | null };
   _count: { rebits: number };
@@ -31,6 +33,8 @@ function toFeedBit(b: BitForFeed): BitWithAuthor {
     id: b.id,
     content: b.content,
     tags: b.tags,
+    aiCollab: b.aiCollab,
+    thread: b.thread,
     createdAtLabel: toRelativeLabel(b.createdAt),
     author: b.author,
   };
@@ -52,8 +56,10 @@ export async function getFeed(): Promise<FeedItem[]> {
     id: true,
     content: true,
     tags: true,
+    aiCollab: true,
     createdAt: true,
     author: { select: { id: true, nickname: true, image: true } },
+    thread: { select: { id: true, title: true } },
     _count: { select: { rebits: true } },
     rebits: { where: { userId: myId }, select: { id: true } },
   } as const;

@@ -7,6 +7,12 @@ datasource db {
   provider = "postgresql"
 }
 
+enum AiCollab {
+  NONE
+  HINT
+  LED
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -18,18 +24,35 @@ model User {
 
   bits      Bit[]
   rebits    Rebit[]
+  threads   Thread[]
 
   @@map("users")
 }
 
-model Bit {
+model Thread {
   id        String   @id @default(cuid())
-  content   String   @db.VarChar(500)
-  tags      String[]
+  title     String   @db.VarChar(100)
   authorId  String
   author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  bits      Bit[]
+
+  @@map("threads")
+}
+
+model Bit {
+  id        String    @id @default(cuid())
+  content   String    @db.VarChar(500)
+  tags      String[]
+  aiCollab  AiCollab  @default(NONE)
+  authorId  String
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  threadId  String?
+  thread    Thread?   @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   rebits    Rebit[]
 
