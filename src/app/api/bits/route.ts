@@ -9,6 +9,8 @@ export async function GET() {
 
 const CreateBitSchema = z.object({
   content: z.string().trim().min(1).max(500),
+  threadId: z.string().optional(),
+  aiCollab: z.enum(["NONE", "HINT", "LED"]).optional(),
 });
 
 export async function POST(request: Request) {
@@ -28,7 +30,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const bit = await createBit({ content: parsed.data.content });
+    const bit = await createBit({
+      content: parsed.data.content,
+      threadId: parsed.data.threadId,
+      aiCollab: parsed.data.aiCollab,
+    });
     return NextResponse.json(bit, { status: 201 });
   } catch {
     return NextResponse.json(
