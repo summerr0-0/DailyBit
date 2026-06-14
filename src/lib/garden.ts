@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { DEV_USER } from "@/lib/bits";
+import { DEV_USER, toRelativeLabel, type BitWithAuthor } from "@/lib/bits";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -82,8 +82,10 @@ export function buildGardenGrid(
 }
 
 /**
- * dev 유저의 지난 1년 활동(Bit + Rebit)을 일별 집계해 잔디 그리드를 반환한다.
- * 스키마 변경 없이 createdAt만 집계한다. 유저가 없으면 빈 잔디.
+ * dev 유저의 지난 1년 Bit를 탐구 깊이 가중치로 집계해 잔디 그리드를 반환한다.
+ * - Thread Bit(탐구 이어쓰기): 2점
+ * - 독립 메모: 1점
+ * Rebit는 소셜 상호작용이므로 제외한다.
  */
 export async function getGarden(): Promise<GardenData> {
   const todayKey = toKstDateKey(new Date());
@@ -94,25 +96,53 @@ export async function getGarden(): Promise<GardenData> {
   });
   if (!me) return buildGardenGrid(new Map(), todayKey);
 
-  // 그리드 범위(53주)보다 약간 넉넉히 조회 (KST 경계 여유)
   const since = new Date(Date.now() - (WEEKS * 7 + 2) * DAY_MS);
 
-  const [bits, rebits] = await Promise.all([
-    prisma.bit.findMany({
-      where: { authorId: me.id, createdAt: { gte: since } },
-      select: { createdAt: true },
-    }),
-    prisma.rebit.findMany({
-      where: { userId: me.id, createdAt: { gte: since } },
-      select: { createdAt: true },
-    }),
-  ]);
+  const bits = await prisma.bit.findMany({
+    where: { authorId: me.id, createdAt: { gte: since } },
+    select: { createdAt: true, threadId: true },
+  });
 
-  const countByDate = new Map<string, number>();
-  for (const { createdAt } of [...bits, ...rebits]) {
+  const scoreByDate = new Map<string, number>();
+  for (const { createdAt, threadId } of bits) {
     const key = toKstDateKey(createdAt);
-    countByDate.set(key, (countByDate.get(key) ?? 0) + 1);
+    const pts = threadId ? 2 : 1;
+    scoreByDate.set(key, (scoreByDate.get(key) ?? 0) + pts);
   }
 
-  return buildGardenGrid(countByDate, todayKey);
+  return buildGardenGrid(scoreByDate, todayKey);
+}
+
+/** KST 날짜(yyyy-mm-dd)에 작성된 Bit를 최신순으로 반환한다. */
+export async function getBitsByDateKST(dateKey: string): Promise<BitWithAuthor[]> {
+  const me = await prisma.user.findUnique({
+    where: { email: DEV_USER.email },
+    select: { id: true },
+  });
+  if (!me) return [];
+
+  const startUTC = new Date(new Date(`${dateKey}T00:00:00Z`).getTime() - KST_OFFSET_MS);
+  const endUTC = new Date(startUTC.getTime() + DAY_MS);
+
+  const rows = await prisma.bit.findMany({
+    where: {
+      authorId: me.id,
+      createdAt: { gte: startUTC, lt: endUTC },
+    },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      content: true,
+      tags: true,
+      aiCollab: true,
+      createdAt: true,
+      author: { select: { id: true, nickname: true, image: true } },
+      thread: { select: { id: true, title: true } },
+    },
+  });
+
+  return rows.map(({ createdAt, ...rest }) => ({
+    ...rest,
+    createdAtLabel: toRelativeLabel(createdAt),
+  }));
 }
