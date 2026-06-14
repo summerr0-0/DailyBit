@@ -15,8 +15,8 @@ const LEVEL_CLASS: Record<GardenLevel, string> = {
 
 const AI_COLLAB_LABEL = {
   NONE: null,
-  HINT: "AI 힌트",
-  LED: "AI 주도",
+  HINT: "AI: Hint",
+  LED: "AI: Led",
 } as const;
 
 function DayPanel({ date, bits, loading }: { date: string; bits: BitWithAuthor[]; loading: boolean }) {
@@ -25,12 +25,12 @@ function DayPanel({ date, bits, loading }: { date: string; bits: BitWithAuthor[]
       <div className="px-3 py-2 bg-muted/50 border-b border-border">
         <span className="text-xs font-medium">{date}</span>
         <span className="text-xs text-muted-foreground ml-2">
-          {loading ? "불러오는 중..." : `${bits.length}개의 기록`}
+          {loading ? "Loading..." : `${bits.length} entries`}
         </span>
       </div>
       {!loading && bits.length === 0 && (
         <p className="text-xs text-muted-foreground px-3 py-4 text-center">
-          이날의 기록이 없습니다.
+          No entries for this day.
         </p>
       )}
       <ol className="divide-y divide-border">
@@ -99,8 +99,8 @@ export function GardenGrid({ data }: { data: GardenData }) {
                 <button
                   key={day.date}
                   onClick={() => handleDayClick(day.date, day.inRange)}
-                  title={`${day.date}: ${day.count}점`}
-                  aria-label={`${day.date} ${day.count}점`}
+                  title={`${day.date}: ${day.count} pts`}
+                  aria-label={`${day.date} ${day.count} pts`}
                   disabled={!day.inRange}
                   className={`h-3 w-3 rounded-sm transition-transform ${
                     day.inRange ? LEVEL_CLASS[day.level] : "bg-transparent"

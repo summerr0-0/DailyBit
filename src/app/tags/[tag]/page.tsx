@@ -18,14 +18,14 @@ export default async function TagPage({
     <main className="max-w-xl mx-auto min-h-screen border-x border-border">
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b border-border px-4 py-3">
         <Link href="/" className="text-xs text-muted-foreground hover:underline">
-          ← 홈
+          &larr; Home
         </Link>
         <h1 className="font-bold text-lg mt-1">#{normalized}</h1>
         <p className="text-xs text-muted-foreground">{bits.length} Bits</p>
       </header>
       {bits.length === 0 ? (
         <div className="text-center text-muted-foreground py-12 text-sm">
-          #{normalized}로 작성된 Bit가 없어요.
+          No Bits tagged #{normalized}.
         </div>
       ) : (
         <div>

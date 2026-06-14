@@ -6,8 +6,8 @@ import { RebitButton } from "./RebitButton";
 
 const AI_COLLAB_LABEL: Record<AiCollabLevel, string | null> = {
   NONE: null,
-  HINT: "AI 힌트",
-  LED: "AI 주도",
+  HINT: "AI: Hint",
+  LED: "AI: Led",
 };
 
 type Props = {
@@ -64,7 +64,7 @@ export function BitCard({ bit, rebit }: Props) {
       )}
       <div className="flex items-center gap-2 mb-1">
         {bit.pinned && (
-          <span className="text-xs text-amber-500 font-medium">핀</span>
+          <span className="text-xs text-amber-500 font-medium">Pin</span>
         )}
         <span className="font-semibold text-sm">{bit.author.nickname}</span>
         <span className="text-muted-foreground text-xs">{bit.createdAtLabel}</span>

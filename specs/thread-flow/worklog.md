@@ -45,3 +45,23 @@ DailyBit을 개인 포트폴리오 블로그로 전환하는 첫 단계.
 - `GET /api/threads` → 200, `POST /api/threads` → 201
 - `POST /api/bits` with threadId + aiCollab: HINT → 응답에 thread 객체 포함 확인
 - `/threads/[id]` → 200, 단계 타임라인 렌더 확인
+
+---
+
+## UI English Localization (follow-up)
+
+Portfolio targets English-speaking interviewers; localized all user-facing Korean strings to English.
+
+### Files updated
+
+- `src/app/layout.tsx` — metadata description
+- `src/app/page.tsx` — Suspense fallback strings
+- `src/app/garden/page.tsx` — back link "← Home", score labels ("pts"), depth legend
+- `src/app/threads/[id]/page.tsx` — back link, "{n} steps", AI badges, date locale en-CA, empty state
+- `src/app/tags/[tag]/page.tsx` — back link, empty state
+- `src/components/bits/BitComposer.tsx` — mode buttons, thread dropdown, placeholders, AI collab label, submit/error messages
+- `src/components/bits/BitCard.tsx` — "AI: Hint"/"AI: Led" badges, "Pin" badge
+- `src/components/bits/BitActionsMenu.tsx` — Pin/Unpin/Delete menu items, confirm/alert dialogs
+- `src/components/bits/BitList.tsx` — empty state messages
+- `src/components/bits/TagFilterBar.tsx` — "Skill Tags" header, "Clear filter" button
+- `docs/backlog.md` — removed SNS items (Like, Follow, Notifications, Mention, Bookmark, Quote Rebit)

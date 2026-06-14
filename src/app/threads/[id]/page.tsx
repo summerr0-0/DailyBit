@@ -8,8 +8,8 @@ type Props = { params: Promise<{ id: string }> };
 
 const AI_COLLAB_LABEL = {
   NONE: null,
-  HINT: "AI 힌트",
-  LED: "AI 주도",
+  HINT: "AI: Hint",
+  LED: "AI: Led",
 } as const;
 
 function renderContent(content: string): ReactNode[] {
@@ -48,10 +48,10 @@ export default async function ThreadPage({ params }: Props) {
     <main className="max-w-xl mx-auto min-h-screen border-x border-border">
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b border-border px-4 py-3">
         <Link href="/" className="text-xs text-muted-foreground hover:underline">
-          &larr; 홈
+          &larr; Home
         </Link>
         <h1 className="font-bold text-lg mt-1">{thread.title}</h1>
-        <p className="text-xs text-muted-foreground">{thread.bits.length}단계 기록</p>
+        <p className="text-xs text-muted-foreground">{thread.bits.length} steps</p>
       </header>
 
       <ol className="relative">
@@ -72,7 +72,7 @@ export default async function ThreadPage({ params }: Props) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs text-muted-foreground">
-                    {new Date(bit.createdAt).toLocaleDateString("ko-KR", {
+                    {new Date(bit.createdAt).toLocaleDateString("en-CA", {
                       month: "short",
                       day: "numeric",
                     })}
@@ -104,7 +104,7 @@ export default async function ThreadPage({ params }: Props) {
 
         {thread.bits.length === 0 && (
           <li className="px-4 py-8 text-center text-sm text-muted-foreground">
-            아직 기록이 없습니다. 홈에서 이 줄기에 첫 단계를 추가해 보세요.
+            No steps yet. Go home and add the first step to this thread.
           </li>
         )}
       </ol>

@@ -11,9 +11,9 @@ const MAX_LENGTH = 500;
 const WARN_THRESHOLD = MAX_LENGTH - 50;
 
 const AI_COLLAB_OPTIONS: { value: AiCollabLevel; label: string }[] = [
-  { value: "NONE", label: "없음" },
-  { value: "HINT", label: "힌트" },
-  { value: "LED", label: "주도" },
+  { value: "NONE", label: "None" },
+  { value: "HINT", label: "Hint" },
+  { value: "LED", label: "Led" },
 ];
 
 type Mode = "standalone" | "thread";
@@ -71,7 +71,7 @@ export function BitComposer() {
       setNewThreadTitle("");
       setShowNewThread(false);
     } catch {
-      setError("줄기 생성에 실패했습니다.");
+      setError("Failed to create thread.");
     }
   }
 
@@ -97,7 +97,7 @@ export function BitComposer() {
       setContent("");
       router.refresh();
     } catch {
-      setError("Bit를 올리지 못했어요. 다시 시도해 주세요.");
+      setError("Failed to post. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -134,7 +134,7 @@ export function BitComposer() {
               : "border-border text-muted-foreground hover:text-foreground"
           }`}
         >
-          독립 메모
+          Standalone Note
         </button>
         <button
           type="button"
@@ -145,7 +145,7 @@ export function BitComposer() {
               : "border-border text-muted-foreground hover:text-foreground"
           }`}
         >
-          탐구 줄기에 이어쓰기
+          Continue a Thread
         </button>
       </div>
 
@@ -160,12 +160,12 @@ export function BitComposer() {
             >
               {threads.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.title} ({t.bitCount}단계)
+                  {t.title} ({t.bitCount} stages)
                 </option>
               ))}
             </select>
           ) : (
-            <p className="text-xs text-muted-foreground">아직 탐구 줄기가 없습니다.</p>
+            <p className="text-xs text-muted-foreground">No threads yet.</p>
           )}
 
           {showNewThread ? (
@@ -174,7 +174,7 @@ export function BitComposer() {
                 type="text"
                 value={newThreadTitle}
                 onChange={(e) => setNewThreadTitle(e.target.value)}
-                placeholder="줄기 제목 (예: Next.js 캐싱 삽질기)"
+                placeholder="Thread title (e.g. Next.js caching deep-dive)"
                 maxLength={100}
                 className="flex-1 text-xs bg-transparent border border-border rounded px-2 py-1 outline-none"
                 onKeyDown={(e) => {
@@ -189,14 +189,14 @@ export function BitComposer() {
                 onClick={() => void handleCreateThread()}
                 className="text-xs px-2 py-1 rounded border border-border hover:bg-muted"
               >
-                만들기
+                Create
               </button>
               <button
                 type="button"
                 onClick={() => setShowNewThread(false)}
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
-                취소
+                Cancel
               </button>
             </div>
           ) : (
@@ -205,7 +205,7 @@ export function BitComposer() {
               onClick={() => setShowNewThread(true)}
               className="text-xs text-muted-foreground hover:text-foreground underline"
             >
-              + 새 탐구 줄기 만들기
+              + New thread
             </button>
           )}
         </div>
@@ -217,16 +217,16 @@ export function BitComposer() {
         onKeyDown={handleKeyDown}
         placeholder={
           mode === "thread"
-            ? "이 단계에서 무엇을 발견했나요? #태그 도 써보세요"
-            : "무슨 생각을 하고 있나요? #태그 도 써보세요"
+            ? "What did you discover in this step? Try #tags too"
+            : "What are you thinking about? Try #tags too"
         }
         rows={3}
-        aria-label="Bit 내용"
+        aria-label="Bit content"
         className="w-full resize-none bg-transparent text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
       />
 
       {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1" aria-label="태그 미리보기">
+        <div className="flex flex-wrap gap-1" aria-label="Tag preview">
           {tags.map((tag) => (
             <span key={tag} className="text-xs text-blue-500">
               #{tag}
@@ -235,9 +235,8 @@ export function BitComposer() {
         </div>
       )}
 
-      {/* AI 협업 강도 */}
       <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">AI 협업:</span>
+        <span className="text-xs text-muted-foreground">AI collab:</span>
         {AI_COLLAB_OPTIONS.map((opt) => (
           <button
             key={opt.value}
@@ -259,7 +258,7 @@ export function BitComposer() {
           {content.length}/{MAX_LENGTH}
         </span>
         <Button type="submit" size="sm" disabled={!canSubmit}>
-          {submitting ? "올리는 중..." : "Bit 올리기"}
+          {submitting ? "Posting..." : "Post Bit"}
         </Button>
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}

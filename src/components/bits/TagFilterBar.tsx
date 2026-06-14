@@ -39,7 +39,7 @@ export function TagFilterBar({ tags, selectedTags }: Props) {
   return (
     <div className="border-b border-border px-4 py-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-muted-foreground">역량 태그</span>
+        <span className="text-xs font-medium text-muted-foreground">Skill Tags</span>
         {selectedTags.length > 0 && (
           <button
             onClick={() => {
@@ -49,7 +49,7 @@ export function TagFilterBar({ tags, selectedTags }: Props) {
             }}
             className="text-xs text-muted-foreground hover:text-foreground underline"
           >
-            필터 초기화
+            Clear filter
           </button>
         )}
       </div>
