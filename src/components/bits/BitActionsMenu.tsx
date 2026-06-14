@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { Menu } from "@base-ui/react/menu";
 import { MoreHorizontal } from "lucide-react";
 
-type Props = { bitId: string };
+type Props = { bitId: string; pinned?: boolean };
 
-export function BitActionsMenu({ bitId }: Props) {
+export function BitActionsMenu({ bitId, pinned = false }: Props) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
+  const [pinning, setPinning] = useState(false);
 
   async function handleDelete() {
     if (deleting) return;
@@ -26,6 +27,17 @@ export function BitActionsMenu({ bitId }: Props) {
     }
   }
 
+  async function handlePin() {
+    if (pinning) return;
+    setPinning(true);
+    try {
+      const res = await fetch(`/api/bits/${bitId}`, { method: "PATCH" });
+      if (res.ok) router.refresh();
+    } finally {
+      setPinning(false);
+    }
+  }
+
   return (
     <Menu.Root>
       <Menu.Trigger
@@ -37,6 +49,13 @@ export function BitActionsMenu({ bitId }: Props) {
       <Menu.Portal>
         <Menu.Positioner align="end" sideOffset={4} className="z-20">
           <Menu.Popup className="min-w-28 overflow-hidden rounded-md border border-border bg-background py-1 shadow-md outline-none">
+            <Menu.Item
+              onClick={handlePin}
+              disabled={pinning}
+              className="cursor-pointer select-none px-3 py-2 text-sm outline-none data-[disabled]:opacity-50 data-[highlighted]:bg-muted"
+            >
+              {pinned ? "핀 해제" : "핀 고정"}
+            </Menu.Item>
             <Menu.Item
               onClick={handleDelete}
               disabled={deleting}
