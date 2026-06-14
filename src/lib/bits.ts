@@ -92,6 +92,38 @@ export async function getBitsByTag(tag: string): Promise<BitWithAuthor[]> {
   return rows.map(toBitWithAuthor);
 }
 
+/** 복수 태그의 AND 교집합으로 Bit를 필터링한다. 태그 없으면 전체 반환. */
+export async function getBitsFiltered(filterTags: string[]): Promise<BitWithAuthor[]> {
+  const normalized = filterTags.map((t) => t.toLowerCase()).filter(Boolean);
+
+  const rows = await prisma.bit.findMany({
+    where:
+      normalized.length > 0
+        ? { AND: normalized.map((tag) => ({ tags: { has: tag } })) }
+        : undefined,
+    orderBy: { createdAt: "desc" },
+    select: BIT_SELECT,
+  });
+
+  return rows.map(toBitWithAuthor);
+}
+
+/** 전체 Bit에서 태그 사용 빈도를 내림차순으로 반환한다. */
+export async function getTagCloud(): Promise<{ tag: string; count: number }[]> {
+  const rows = await prisma.bit.findMany({ select: { tags: true } });
+
+  const counts = new Map<string, number>();
+  for (const { tags } of rows) {
+    for (const tag of tags) {
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+  }
+
+  return Array.from(counts.entries())
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
 /**
  * 새 Bit를 생성한다.
  * - 작성자는 고정 dev 유저를 email 기준 upsert로 확보 (시드 실행 여부와 무관, 프로덕션 안전).
