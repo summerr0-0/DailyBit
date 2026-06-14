@@ -17,10 +17,13 @@ export default async function GardenPage() {
       </header>
       <div className="p-4">
         <p className="text-sm">
-          오늘 <span className="font-bold text-green-600">{data.todayCount}개</span>
+          오늘 <span className="font-bold text-green-600">{data.todayCount}점</span>
+        </p>
+        <p className="text-xs text-muted-foreground mb-1">
+          지난 1년 탐구 점수 {data.total}점
         </p>
         <p className="text-xs text-muted-foreground mb-4">
-          지난 1년 활동 {data.total}개
+          탐구 줄기 기록 2pt · 독립 메모 1pt
         </p>
         <GardenGrid data={data} />
       </div>
