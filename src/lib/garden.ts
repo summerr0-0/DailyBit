@@ -135,14 +135,16 @@ export async function getBitsByDateKST(dateKey: string): Promise<BitWithAuthor[]
       content: true,
       tags: true,
       aiCollab: true,
+      pinned: true,
       createdAt: true,
       author: { select: { id: true, nickname: true, image: true } },
       thread: { select: { id: true, title: true } },
     },
   });
 
-  return rows.map(({ createdAt, ...rest }) => ({
+  return rows.map(({ createdAt, pinned, ...rest }) => ({
     ...rest,
+    pinned: pinned ?? false,
     createdAtLabel: toRelativeLabel(createdAt),
   }));
 }

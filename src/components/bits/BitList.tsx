@@ -23,7 +23,7 @@ export async function BitList({ filterTags = [] }: Props) {
         <div key={bit.id} className="relative">
           <BitCard bit={bit} />
           <div className="absolute right-3 top-3">
-            <BitActionsMenu bitId={bit.id} />
+            <BitActionsMenu bitId={bit.id} pinned={bit.pinned} />
           </div>
         </div>
       ))}

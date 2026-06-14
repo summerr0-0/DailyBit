@@ -1,5 +1,17 @@
 import { NextResponse } from "next/server";
-import { deleteBit } from "@/lib/bits";
+import { deleteBit, toggleBitPin } from "@/lib/bits";
+
+export async function PATCH(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const found = await toggleBitPin(id);
+  if (!found) {
+    return NextResponse.json({ error: "Bit를 찾을 수 없습니다." }, { status: 404 });
+  }
+  return NextResponse.json({ ok: true });
+}
 
 export async function DELETE(
   _request: Request,

@@ -63,6 +63,9 @@ export function BitCard({ bit, rebit }: Props) {
         </div>
       )}
       <div className="flex items-center gap-2 mb-1">
+        {bit.pinned && (
+          <span className="text-xs text-amber-500 font-medium">핀</span>
+        )}
         <span className="font-semibold text-sm">{bit.author.nickname}</span>
         <span className="text-muted-foreground text-xs">{bit.createdAtLabel}</span>
         {aiLabel && (

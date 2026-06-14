@@ -27,6 +27,7 @@ export type BitWithAuthor = {
   content: string;
   tags: string[];
   aiCollab: AiCollabLevel;
+  pinned: boolean;
   thread: { id: string; title: string } | null;
   createdAtLabel: string;
   author: {
@@ -50,6 +51,7 @@ type BitRow = {
   content: string;
   tags: string[];
   aiCollab: AiCollabLevel;
+  pinned: boolean;
   thread: { id: string; title: string } | null;
   createdAt: Date;
   author: { id: string; nickname: string; image: string | null };
@@ -64,6 +66,7 @@ const BIT_SELECT = {
   content: true,
   tags: true,
   aiCollab: true,
+  pinned: true,
   createdAt: true,
   author: { select: { id: true, nickname: true, image: true } },
   thread: { select: { id: true, title: true } },
@@ -71,7 +74,7 @@ const BIT_SELECT = {
 
 export async function getBits(): Promise<BitWithAuthor[]> {
   const rows = await prisma.bit.findMany({
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
     select: BIT_SELECT,
   });
 
@@ -92,7 +95,7 @@ export async function getBitsByTag(tag: string): Promise<BitWithAuthor[]> {
   return rows.map(toBitWithAuthor);
 }
 
-/** 복수 태그의 AND 교집합으로 Bit를 필터링한다. 태그 없으면 전체 반환. */
+/** 복수 태그의 AND 교집합으로 Bit를 필터링한다. 태그 없으면 전체 반환. 핀 고정 항목 우선. */
 export async function getBitsFiltered(filterTags: string[]): Promise<BitWithAuthor[]> {
   const normalized = filterTags.map((t) => t.toLowerCase()).filter(Boolean);
 
@@ -101,7 +104,7 @@ export async function getBitsFiltered(filterTags: string[]): Promise<BitWithAuth
       normalized.length > 0
         ? { AND: normalized.map((tag) => ({ tags: { has: tag } })) }
         : undefined,
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
     select: BIT_SELECT,
   });
 
@@ -148,6 +151,14 @@ export async function createBit(input: {
   });
 
   return toBitWithAuthor(row);
+}
+
+/** Bit의 pinned 상태를 토글한다. 대상이 없으면 false 반환. */
+export async function toggleBitPin(id: string): Promise<boolean> {
+  const bit = await prisma.bit.findUnique({ where: { id }, select: { pinned: true } });
+  if (!bit) return false;
+  await prisma.bit.update({ where: { id }, data: { pinned: !bit.pinned } });
+  return true;
 }
 
 /**
