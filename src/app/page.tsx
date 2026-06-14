@@ -23,10 +23,10 @@ export default async function HomePage({ searchParams }: Props) {
         </Link>
       </header>
       <BitComposer />
-      <Suspense fallback={<div className="px-4 py-3 text-xs text-muted-foreground">태그 로딩...</div>}>
+      <Suspense fallback={<div className="px-4 py-3 text-xs text-muted-foreground">Loading tags...</div>}>
         <TagFilterSection selectedTags={selectedTags} />
       </Suspense>
-      <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">로딩 중...</div>}>
+      <Suspense fallback={<div className="p-4 text-sm text-muted-foreground">Loading...</div>}>
         <BitList filterTags={selectedTags} />
       </Suspense>
     </main>

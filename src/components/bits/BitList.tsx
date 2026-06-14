@@ -11,8 +11,8 @@ export async function BitList({ filterTags = [] }: Props) {
     return (
       <div className="text-center text-muted-foreground py-12 text-sm">
         {filterTags.length > 0
-          ? `#${filterTags.join(", #")} 태그가 달린 기록이 없습니다.`
-          : "아직 기록이 없습니다."}
+          ? `No entries tagged #${filterTags.join(", #")}.`
+          : "No entries yet."}
       </div>
     );
   }
