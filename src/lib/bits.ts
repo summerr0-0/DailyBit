@@ -20,10 +20,15 @@ export async function ensureDevUser(): Promise<{ id: string }> {
   });
 }
 
+export type AiCollabLevel = "NONE" | "HINT" | "LED";
+
 export type BitWithAuthor = {
   id: string;
   content: string;
   tags: string[];
+  aiCollab: AiCollabLevel;
+  pinned: boolean;
+  thread: { id: string; title: string } | null;
   createdAtLabel: string;
   author: {
     id: string;
@@ -45,6 +50,9 @@ type BitRow = {
   id: string;
   content: string;
   tags: string[];
+  aiCollab: AiCollabLevel;
+  pinned: boolean;
+  thread: { id: string; title: string } | null;
   createdAt: Date;
   author: { id: string; nickname: string; image: string | null };
 };
@@ -53,18 +61,21 @@ function toBitWithAuthor({ createdAt, ...rest }: BitRow): BitWithAuthor {
   return { ...rest, createdAtLabel: toRelativeLabel(createdAt) };
 }
 
+const BIT_SELECT = {
+  id: true,
+  content: true,
+  tags: true,
+  aiCollab: true,
+  pinned: true,
+  createdAt: true,
+  author: { select: { id: true, nickname: true, image: true } },
+  thread: { select: { id: true, title: true } },
+} as const;
+
 export async function getBits(): Promise<BitWithAuthor[]> {
   const rows = await prisma.bit.findMany({
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      content: true,
-      tags: true,
-      createdAt: true,
-      author: {
-        select: { id: true, nickname: true, image: true },
-      },
-    },
+    orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
+    select: BIT_SELECT,
   });
 
   return rows.map(toBitWithAuthor);
@@ -78,18 +89,42 @@ export async function getBitsByTag(tag: string): Promise<BitWithAuthor[]> {
   const rows = await prisma.bit.findMany({
     where: { tags: { has: tag.toLowerCase() } },
     orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      content: true,
-      tags: true,
-      createdAt: true,
-      author: {
-        select: { id: true, nickname: true, image: true },
-      },
-    },
+    select: BIT_SELECT,
   });
 
   return rows.map(toBitWithAuthor);
+}
+
+/** 복수 태그의 AND 교집합으로 Bit를 필터링한다. 태그 없으면 전체 반환. 핀 고정 항목 우선. */
+export async function getBitsFiltered(filterTags: string[]): Promise<BitWithAuthor[]> {
+  const normalized = filterTags.map((t) => t.toLowerCase()).filter(Boolean);
+
+  const rows = await prisma.bit.findMany({
+    where:
+      normalized.length > 0
+        ? { AND: normalized.map((tag) => ({ tags: { has: tag } })) }
+        : undefined,
+    orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
+    select: BIT_SELECT,
+  });
+
+  return rows.map(toBitWithAuthor);
+}
+
+/** 전체 Bit에서 태그 사용 빈도를 내림차순으로 반환한다. */
+export async function getTagCloud(): Promise<{ tag: string; count: number }[]> {
+  const rows = await prisma.bit.findMany({ select: { tags: true } });
+
+  const counts = new Map<string, number>();
+  for (const { tags } of rows) {
+    for (const tag of tags) {
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+  }
+
+  return Array.from(counts.entries())
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count);
 }
 
 /**
@@ -97,7 +132,11 @@ export async function getBitsByTag(tag: string): Promise<BitWithAuthor[]> {
  * - 작성자는 고정 dev 유저를 email 기준 upsert로 확보 (시드 실행 여부와 무관, 프로덕션 안전).
  * - 태그는 본문에서 파싱·정규화한다 (parseTags).
  */
-export async function createBit(input: { content: string }): Promise<BitWithAuthor> {
+export async function createBit(input: {
+  content: string;
+  threadId?: string;
+  aiCollab?: AiCollabLevel;
+}): Promise<BitWithAuthor> {
   const author = await ensureDevUser();
 
   const row = await prisma.bit.create({
@@ -105,19 +144,21 @@ export async function createBit(input: { content: string }): Promise<BitWithAuth
       content: input.content,
       tags: parseTags(input.content),
       authorId: author.id,
+      ...(input.threadId ? { threadId: input.threadId } : {}),
+      ...(input.aiCollab ? { aiCollab: input.aiCollab } : {}),
     },
-    select: {
-      id: true,
-      content: true,
-      tags: true,
-      createdAt: true,
-      author: {
-        select: { id: true, nickname: true, image: true },
-      },
-    },
+    select: BIT_SELECT,
   });
 
   return toBitWithAuthor(row);
+}
+
+/** Bit의 pinned 상태를 토글한다. 대상이 없으면 false 반환. */
+export async function toggleBitPin(id: string): Promise<boolean> {
+  const bit = await prisma.bit.findUnique({ where: { id }, select: { pinned: true } });
+  if (!bit) return false;
+  await prisma.bit.update({ where: { id }, data: { pinned: !bit.pinned } });
+  return true;
 }
 
 /**
