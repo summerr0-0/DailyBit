@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "DailyBit",
-  description: "자유로운 글쓰기와 활동 시각화를 결합한 SNS",
+  description: "Developer portfolio & learning blog — tracking problem-solving journeys thread by thread.",
 };
 
 export default function RootLayout({

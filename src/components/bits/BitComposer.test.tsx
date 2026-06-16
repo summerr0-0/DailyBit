@@ -9,34 +9,34 @@ vi.mock("next/navigation", () => ({
 describe("BitComposer", () => {
   it("textarea와 제출 버튼을 렌더링한다", () => {
     render(<BitComposer />);
-    expect(screen.getByLabelText("Bit 내용")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Bit 올리기/ })).toBeInTheDocument();
+    expect(screen.getByLabelText("Bit content")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Post Bit/ })).toBeInTheDocument();
   });
 
   it("내용이 비어있으면 제출 버튼이 비활성화된다", () => {
     render(<BitComposer />);
-    expect(screen.getByRole("button", { name: /Bit 올리기/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Post Bit/ })).toBeDisabled();
   });
 
   it("공백만 입력하면 제출 버튼이 비활성화된다", () => {
     render(<BitComposer />);
-    fireEvent.change(screen.getByLabelText("Bit 내용"), {
+    fireEvent.change(screen.getByLabelText("Bit content"), {
       target: { value: "   " },
     });
-    expect(screen.getByRole("button", { name: /Bit 올리기/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Post Bit/ })).toBeDisabled();
   });
 
   it("내용을 입력하면 제출 버튼이 활성화된다", () => {
     render(<BitComposer />);
-    fireEvent.change(screen.getByLabelText("Bit 내용"), {
+    fireEvent.change(screen.getByLabelText("Bit content"), {
       target: { value: "안녕하세요 #dailybit" },
     });
-    expect(screen.getByRole("button", { name: /Bit 올리기/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Post Bit/ })).toBeEnabled();
   });
 
   it("글자 수 카운터를 보여준다", () => {
     render(<BitComposer />);
-    fireEvent.change(screen.getByLabelText("Bit 내용"), {
+    fireEvent.change(screen.getByLabelText("Bit content"), {
       target: { value: "hello" },
     });
     expect(screen.getByText("5/500")).toBeInTheDocument();
@@ -47,7 +47,7 @@ describe("BitComposer", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<BitComposer />);
-    const textarea = screen.getByLabelText("Bit 내용");
+    const textarea = screen.getByLabelText("Bit content");
     fireEvent.change(textarea, { target: { value: "hello world" } });
     fireEvent.keyDown(textarea, { key: "Enter", metaKey: true });
 
@@ -64,7 +64,7 @@ describe("BitComposer", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<BitComposer />);
-    const textarea = screen.getByLabelText("Bit 내용");
+    const textarea = screen.getByLabelText("Bit content");
     fireEvent.change(textarea, { target: { value: "hello world" } });
     fireEvent.keyDown(textarea, { key: "Enter", ctrlKey: true });
 
@@ -77,7 +77,7 @@ describe("BitComposer", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<BitComposer />);
-    const textarea = screen.getByLabelText("Bit 내용");
+    const textarea = screen.getByLabelText("Bit content");
     fireEvent.change(textarea, { target: { value: "hello world" } });
     fireEvent.keyDown(textarea, { key: "Enter" });
 
@@ -87,25 +87,25 @@ describe("BitComposer", () => {
 
   it("입력 중 #태그를 소문자·중복제거하여 미리보기로 보여준다", () => {
     render(<BitComposer />);
-    fireEvent.change(screen.getByLabelText("Bit 내용"), {
+    fireEvent.change(screen.getByLabelText("Bit content"), {
       target: { value: "공부 중 #React #react #DevLog" },
     });
-    const preview = screen.getByLabelText("태그 미리보기");
+    const preview = screen.getByLabelText("Tag preview");
     expect(within(preview).getAllByText("#react")).toHaveLength(1);
     expect(within(preview).getByText("#devlog")).toBeInTheDocument();
   });
 
   it("태그가 없으면 미리보기를 렌더링하지 않는다", () => {
     render(<BitComposer />);
-    fireEvent.change(screen.getByLabelText("Bit 내용"), {
+    fireEvent.change(screen.getByLabelText("Bit content"), {
       target: { value: "태그 없는 본문" },
     });
-    expect(screen.queryByLabelText("태그 미리보기")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Tag preview")).not.toBeInTheDocument();
   });
 
   it("한계 임박(450자 이상)이면 카운터에 경고색을 적용한다", () => {
     render(<BitComposer />);
-    fireEvent.change(screen.getByLabelText("Bit 내용"), {
+    fireEvent.change(screen.getByLabelText("Bit content"), {
       target: { value: "a".repeat(460) },
     });
     expect(screen.getByText("460/500").className).toContain("text-amber-500");
@@ -113,10 +113,10 @@ describe("BitComposer", () => {
 
   it("500자 초과면 위험색을 적용하고 제출을 막는다", () => {
     render(<BitComposer />);
-    fireEvent.change(screen.getByLabelText("Bit 내용"), {
+    fireEvent.change(screen.getByLabelText("Bit content"), {
       target: { value: "a".repeat(501) },
     });
     expect(screen.getByText("501/500").className).toContain("text-destructive");
-    expect(screen.getByRole("button", { name: /Bit 올리기/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Post Bit/ })).toBeDisabled();
   });
 });

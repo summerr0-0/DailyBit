@@ -11,6 +11,9 @@ const base: BitWithAuthor = {
   id: "test-1",
   content: "테스트 Bit 내용입니다.",
   tags: [],
+  aiCollab: "NONE",
+  pinned: false,
+  thread: null,
   createdAtLabel: "방금 전",
   author: { id: "user-1", nickname: "testuser", image: null },
 };

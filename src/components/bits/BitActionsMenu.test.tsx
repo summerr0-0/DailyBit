@@ -17,16 +17,16 @@ afterEach(() => {
 describe("BitActionsMenu", () => {
   it("⋯ 트리거를 렌더하고 메뉴는 기본 닫혀 있다", () => {
     render(<BitActionsMenu bitId="bit-1" />);
-    expect(screen.getByRole("button", { name: "Bit 메뉴" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Bit menu" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem")).not.toBeInTheDocument();
   });
 
   it("트리거 클릭 시 삭제 항목이 열린다", async () => {
     const user = userEvent.setup();
     render(<BitActionsMenu bitId="bit-1" />);
-    await user.click(screen.getByRole("button", { name: "Bit 메뉴" }));
+    await user.click(screen.getByRole("button", { name: "Bit menu" }));
     expect(
-      await screen.findByRole("menuitem", { name: "삭제" }),
+      await screen.findByRole("menuitem", { name: "Delete" }),
     ).toBeInTheDocument();
   });
 
@@ -37,8 +37,8 @@ describe("BitActionsMenu", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<BitActionsMenu bitId="bit-1" />);
-    await user.click(screen.getByRole("button", { name: "Bit 메뉴" }));
-    await user.click(await screen.findByRole("menuitem", { name: "삭제" }));
+    await user.click(screen.getByRole("button", { name: "Bit menu" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/bits/bit-1", {
@@ -55,8 +55,8 @@ describe("BitActionsMenu", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<BitActionsMenu bitId="bit-1" />);
-    await user.click(screen.getByRole("button", { name: "Bit 메뉴" }));
-    await user.click(await screen.findByRole("menuitem", { name: "삭제" }));
+    await user.click(screen.getByRole("button", { name: "Bit menu" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(refresh).not.toHaveBeenCalled();
@@ -65,9 +65,9 @@ describe("BitActionsMenu", () => {
   it("Escape로 메뉴가 닫힌다", async () => {
     const user = userEvent.setup();
     render(<BitActionsMenu bitId="bit-1" />);
-    await user.click(screen.getByRole("button", { name: "Bit 메뉴" }));
+    await user.click(screen.getByRole("button", { name: "Bit menu" }));
     expect(
-      await screen.findByRole("menuitem", { name: "삭제" }),
+      await screen.findByRole("menuitem", { name: "Delete" }),
     ).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
@@ -84,8 +84,8 @@ describe("BitActionsMenu", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<BitActionsMenu bitId="bit-1" />);
-    await user.click(screen.getByRole("button", { name: "Bit 메뉴" }));
-    await user.click(await screen.findByRole("menuitem", { name: "삭제" }));
+    await user.click(screen.getByRole("button", { name: "Bit menu" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
 
     await waitFor(() => expect(window.alert).toHaveBeenCalled());
     expect(refresh).not.toHaveBeenCalled();
