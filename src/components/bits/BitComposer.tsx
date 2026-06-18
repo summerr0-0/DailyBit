@@ -1,100 +1,38 @@
 "use client";
 
-import { useState, useEffect, type FormEvent, type KeyboardEvent } from "react";
+import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { parseTags } from "@/lib/tags";
-import type { AiCollabLevel } from "@/lib/bits";
-import type { ThreadSummary } from "@/lib/threads";
 
 const MAX_LENGTH = 500;
 const WARN_THRESHOLD = MAX_LENGTH - 50;
 
-const AI_COLLAB_OPTIONS: { value: AiCollabLevel; label: string }[] = [
-  { value: "NONE", label: "None" },
-  { value: "HINT", label: "Hint" },
-  { value: "LED", label: "Led" },
-];
-
-type Mode = "standalone" | "thread";
-
 export function BitComposer() {
   const router = useRouter();
   const [content, setContent] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const [mode, setMode] = useState<Mode>("standalone");
-  const [aiCollab, setAiCollab] = useState<AiCollabLevel>("NONE");
-
-  const [threads, setThreads] = useState<ThreadSummary[]>([]);
-  const [selectedThreadId, setSelectedThreadId] = useState<string>("");
-  const [showNewThread, setShowNewThread] = useState(false);
-  const [newThreadTitle, setNewThreadTitle] = useState("");
 
   const isEmpty = content.trim().length === 0;
   const isOverLimit = content.length > MAX_LENGTH;
   const isNearLimit = !isOverLimit && content.length >= WARN_THRESHOLD;
-  const canSubmit =
-    !isEmpty &&
-    !isOverLimit &&
-    !submitting &&
-    (mode === "standalone" || !!selectedThreadId);
+  const canSubmit = !isEmpty && !isOverLimit && !submitting;
   const tags = parseTags(content);
-
-  useEffect(() => {
-    if (mode === "thread") {
-      fetch("/api/threads")
-        .then((r) => r.json())
-        .then((data: ThreadSummary[]) => {
-          setThreads(data);
-          if (data.length > 0 && !selectedThreadId) {
-            setSelectedThreadId(data[0].id);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [mode]);
-
-  async function handleCreateThread() {
-    if (!newThreadTitle.trim()) return;
-    try {
-      const res = await fetch("/api/threads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: newThreadTitle.trim() }),
-      });
-      if (!res.ok) throw new Error();
-      const created: ThreadSummary = await res.json();
-      setThreads((prev) => [created, ...prev]);
-      setSelectedThreadId(created.id);
-      setNewThreadTitle("");
-      setShowNewThread(false);
-    } catch {
-      setError("Failed to create thread.");
-    }
-  }
 
   async function submit() {
     if (!canSubmit) return;
-
     setSubmitting(true);
     setError(null);
-
     try {
       const res = await fetch("/api/bits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content,
-          ...(mode === "thread" ? { threadId: selectedThreadId } : {}),
-          ...(aiCollab !== "NONE" ? { aiCollab } : {}),
-        }),
+        body: JSON.stringify({ content, private: isPrivate }),
       });
-
       if (!res.ok) throw new Error("request failed");
-
       setContent("");
+      setIsPrivate(false);
       router.refresh();
     } catch {
       setError("Failed to post. Please try again.");
@@ -122,146 +60,80 @@ export function BitComposer() {
       : "text-xs text-muted-foreground";
 
   return (
-    <form onSubmit={handleSubmit} className="border-b border-border px-4 py-3 space-y-2">
-      {/* 작성 모드 선택 */}
-      <div className="flex gap-2 text-xs">
-        <button
-          type="button"
-          onClick={() => setMode("standalone")}
-          className={`px-2 py-1 rounded border transition-colors ${
-            mode === "standalone"
-              ? "border-foreground bg-foreground text-background"
-              : "border-border text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Standalone Note
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("thread")}
-          className={`px-2 py-1 rounded border transition-colors ${
-            mode === "thread"
-              ? "border-foreground bg-foreground text-background"
-              : "border-border text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Continue a Thread
-        </button>
-      </div>
+    <form
+      onSubmit={handleSubmit}
+      style={{
+        background: "#FFFDF8",
+        border: "1px solid #E8E1D2",
+        borderRadius: "18px",
+        padding: "18px 20px",
+        boxShadow: "0 1px 2px rgba(60,50,30,0.04)",
+      }}
+    >
+      <div className="space-y-2">
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="What are you learning today? Try #tags too"
+            rows={3}
+            aria-label="Bit content"
+            className="w-full resize-none bg-transparent text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
+          />
 
-      {/* 탐구 줄기 선택 */}
-      {mode === "thread" && (
-        <div className="space-y-1">
-          {threads.length > 0 ? (
-            <select
-              value={selectedThreadId}
-              onChange={(e) => setSelectedThreadId(e.target.value)}
-              className="w-full text-xs bg-transparent border border-border rounded px-2 py-1 outline-none"
-            >
-              {threads.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title} ({t.bitCount} stages)
-                </option>
-              ))}
-            </select>
-          ) : (
-            <p className="text-xs text-muted-foreground">No threads yet.</p>
-          )}
-
-          {showNewThread ? (
-            <div className="flex gap-1">
-              <input
-                type="text"
-                value={newThreadTitle}
-                onChange={(e) => setNewThreadTitle(e.target.value)}
-                placeholder="Thread title (e.g. Next.js caching deep-dive)"
-                maxLength={100}
-                className="flex-1 text-xs bg-transparent border border-border rounded px-2 py-1 outline-none"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void handleCreateThread();
-                  }
-                }}
-              />
+          {/* Counter + controls + submit */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "10px", borderTop: "1px solid #F0EADC", paddingTop: "13px", gap: "8px" }}>
+            <span style={{ fontSize: "12.5px", color: "#B4AB97" }}>
+              Type <span style={{ color: "#C96820", fontWeight: 600 }}>#tag</span>
+              {" "}· <span className={counterClass}>{content.length}/{MAX_LENGTH}</span>
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <button
                 type="button"
-                onClick={() => void handleCreateThread()}
-                className="text-xs px-2 py-1 rounded border border-border hover:bg-muted"
+                onClick={() => setIsPrivate((v) => !v)}
+                title={isPrivate ? "Private — only you can see this" : "Public — visible to everyone"}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: "4px",
+                  fontSize: "12px", fontWeight: 600, padding: "5px 10px",
+                  borderRadius: "999px", border: "1px solid",
+                  cursor: "pointer", fontFamily: "inherit",
+                  background: isPrivate ? "#FEF3E8" : "transparent",
+                  borderColor: isPrivate ? "#E8A56A" : "#E0D6C4",
+                  color: isPrivate ? "#9C4A1A" : "#B4AB97",
+                  transition: "all 0.15s",
+                }}
               >
-                Create
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                  {isPrivate
+                    ? <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                    : <path d="M12 1C8.676 1 6 3.676 6 7v1H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2h-2V7c0-3.324-2.676-6-6-6zm0 2c2.276 0 4 1.724 4 4v1H8V7c0-2.276 1.724-4 4-4zm0 9c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2z"/>
+                  }
+                </svg>
+                {isPrivate ? "Private" : "Public"}
               </button>
               <button
-                type="button"
-                onClick={() => setShowNewThread(false)}
-                className="text-xs text-muted-foreground hover:text-foreground"
+                type="submit"
+                disabled={!canSubmit}
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  fontFamily: "inherit",
+                  padding: "9px 20px",
+                  borderRadius: "999px",
+                  border: "none",
+                  cursor: canSubmit ? "pointer" : "not-allowed",
+                  background: canSubmit ? "#C96820" : "#E0D6C4",
+                  color: canSubmit ? "#fff" : "#B4AB97",
+                  transition: "background 0.15s, opacity 0.15s",
+                }}
               >
-                Cancel
+                {submitting ? "Posting..." : "Post"}
               </button>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowNewThread(true)}
-              className="text-xs text-muted-foreground hover:text-foreground underline"
-            >
-              + New thread
-            </button>
-          )}
-        </div>
-      )}
+          </div>
 
-      <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={
-          mode === "thread"
-            ? "What did you discover in this step? Try #tags too"
-            : "What are you thinking about? Try #tags too"
-        }
-        rows={3}
-        aria-label="Bit content"
-        className="w-full resize-none bg-transparent text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
-      />
-
-      {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1" aria-label="Tag preview">
-          {tags.map((tag) => (
-            <span key={tag} className="text-xs text-blue-500">
-              #{tag}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">AI collab:</span>
-        {AI_COLLAB_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => setAiCollab(opt.value)}
-            className={`text-xs px-2 py-0.5 rounded border transition-colors ${
-              aiCollab === opt.value
-                ? "border-blue-500 text-blue-500 bg-blue-500/10"
-                : "border-border text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
+          {error && <p className="text-xs" style={{ color: "#C0392B" }}>{error}</p>}
       </div>
-
-      <div className="flex items-center justify-between">
-        <span className={counterClass}>
-          {content.length}/{MAX_LENGTH}
-        </span>
-        <Button type="submit" size="sm" disabled={!canSubmit}>
-          {submitting ? "Posting..." : "Post Bit"}
-        </Button>
-      </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
     </form>
   );
 }

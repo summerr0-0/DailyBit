@@ -61,6 +61,11 @@ export async function createThread(title: string): Promise<ThreadSummary> {
   };
 }
 
+export async function deleteThread(id: string): Promise<boolean> {
+  const { count } = await prisma.thread.deleteMany({ where: { id } });
+  return count > 0;
+}
+
 export async function getThread(id: string): Promise<ThreadWithBits | null> {
   const row = await prisma.thread.findUnique({
     where: { id },

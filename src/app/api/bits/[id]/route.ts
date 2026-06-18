@@ -1,11 +1,28 @@
 import { NextResponse } from "next/server";
-import { deleteBit, toggleBitPin } from "@/lib/bits";
+import { deleteBit, toggleBitPin, toggleBitPrivate } from "@/lib/bits";
+import { requireAuth } from "@/lib/auth";
 
 export async function PATCH(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   const { id } = await params;
+
+  let action = "pin";
+  try {
+    const body = (await request.json()) as { action?: string };
+    if (body.action) action = body.action;
+  } catch { /* no body — default to "pin" for backwards compat */ }
+
+  if (action === "private") {
+    const found = await toggleBitPrivate(id);
+    if (!found) return NextResponse.json({ error: "Bit not found." }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  }
+
   const found = await toggleBitPin(id);
   if (!found) {
     return NextResponse.json({ error: "Bit를 찾을 수 없습니다." }, { status: 404 });
@@ -17,6 +34,9 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   const { id } = await params;
   if (!id) {
     return NextResponse.json({ error: "id가 필요합니다." }, { status: 400 });

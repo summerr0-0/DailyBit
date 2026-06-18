@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getBits, createBit } from "@/lib/bits";
+import { requireAuth } from "@/lib/auth";
 
 export async function GET() {
   const bits = await getBits();
@@ -11,9 +12,13 @@ const CreateBitSchema = z.object({
   content: z.string().trim().min(1).max(500),
   threadId: z.string().optional(),
   aiCollab: z.enum(["NONE", "HINT", "LED"]).optional(),
+  private: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   let body: unknown;
   try {
     body = await request.json();
@@ -34,6 +39,7 @@ export async function POST(request: Request) {
       content: parsed.data.content,
       threadId: parsed.data.threadId,
       aiCollab: parsed.data.aiCollab,
+      private: parsed.data.private,
     });
     return NextResponse.json(bit, { status: 201 });
   } catch {

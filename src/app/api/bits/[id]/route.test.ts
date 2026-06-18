@@ -3,6 +3,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const deleteBit = vi.fn();
 vi.mock("@/lib/bits", () => ({
   deleteBit: (...args: unknown[]) => deleteBit(...args),
+  toggleBitPin: vi.fn(),
+}));
+
+// requireAuth는 테스트에서 항상 통과(로그인된 것으로 간주)
+vi.mock("@/lib/auth", () => ({
+  requireAuth: vi.fn().mockResolvedValue(null),
+  isLoggedIn: vi.fn().mockResolvedValue(true),
 }));
 
 import { DELETE } from "./route";

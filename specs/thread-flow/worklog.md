@@ -48,6 +48,35 @@ DailyBit을 개인 포트폴리오 블로그로 전환하는 첫 단계.
 
 ---
 
+## Interactive Features + Security Hardening + Private Content (follow-up sessions)
+
+### Interactive features
+- Warm orange theme throughout (replaced purple)
+- Login page + passphrase auth (httpOnly cookie, 30-day session)
+- Anonymous comments: per-comment deletion password (bcrypt), 60s spam cooldown
+- Like toggle with cookie-based dedup (likeId in browser cookie, DELETE to unlike)
+- Rebit with optional message (orange bubble)
+- Thread reply button (Twitter-style modal, auto-creates Thread on first reply)
+- ProfileCard: avatar, resume PDF, GitHub/LinkedIn/Email links
+- Tags sidebar (full tagCloud) on thread detail, /threads, /tags/[tag]
+
+### Security hardening
+- Removed hardcoded passphrase fallback from login route (503 if ADMIN_PASSPHRASE unset)
+- Login rate limiting: 5 attempts/IP per 15 min → 429
+- Comment deletion passwords upgraded to bcrypt (cost 10)
+- Auth cookie sameSite: lax → strict
+- Security headers via next.config.ts
+
+### Private content
+- `Bit.private` field: toggle in BitComposer and BitActionsMenu
+- `PrivateTag` model: tag-level privacy managed from TagSidebar lock icon (optimistic UI)
+- Private tag pages return 404 to unauthenticated visitors
+
+### Test results
+- 8 test files, 52 tests — all passing
+
+---
+
 ## UI English Localization (follow-up)
 
 Portfolio targets English-speaking interviewers; localized all user-facing Korean strings to English.
