@@ -2,8 +2,6 @@
 
 import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { parseTags } from "@/lib/tags";
-
 const MAX_LENGTH = 500;
 const WARN_THRESHOLD = MAX_LENGTH - 50;
 
@@ -18,7 +16,6 @@ export function BitComposer() {
   const isOverLimit = content.length > MAX_LENGTH;
   const isNearLimit = !isOverLimit && content.length >= WARN_THRESHOLD;
   const canSubmit = !isEmpty && !isOverLimit && !submitting;
-  const tags = parseTags(content);
 
   async function submit() {
     if (!canSubmit) return;

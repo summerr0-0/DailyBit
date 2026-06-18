@@ -1,6 +1,5 @@
 import { getGarden, getStats } from "@/lib/garden";
 import type { GardenLevel } from "@/lib/garden";
-import Link from "next/link";
 
 const JANDI: Record<GardenLevel, string> = {
   0: "#EBE5D6",

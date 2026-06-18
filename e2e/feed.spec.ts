@@ -8,7 +8,7 @@ test.describe("피드", () => {
 
   test("헤더에 DailyBit 타이틀이 보인다", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "DailyBit" })).toBeVisible();
+    await expect(page.getByText("one small bit a day")).toBeVisible();
   });
 
   test("피드에 Bit 목록이 표시된다", async ({ page }) => {
@@ -17,13 +17,13 @@ test.describe("피드", () => {
     await expect(bits.first()).toBeVisible();
   });
 
-  test("Bit에 작성자 닉네임이 표시된다", async ({ page }) => {
+  test("프로필 카드에 작성자 이름이 표시된다", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("devuser").first()).toBeVisible();
+    await expect(page.getByText("Irin Jeong")).toBeVisible();
   });
 
   test("Bit에 태그가 # 접두사와 함께 표시된다", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("#dailybit", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "#dailybit" }).first()).toBeVisible();
   });
 });
