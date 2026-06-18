@@ -15,6 +15,9 @@ const base: BitWithAuthor = {
   pinned: false,
   thread: null,
   createdAtLabel: "방금 전",
+  likeCount: 0,
+  rebitCount: 0,
+  commentCount: 0,
   author: { id: "user-1", nickname: "testuser", image: null },
 };
 
@@ -29,14 +32,9 @@ describe("BitCard", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 
-  it("작성자 닉네임을 보여준다", () => {
-    render(<BitCard bit={base} />);
-    expect(screen.getByText("testuser")).toBeInTheDocument();
-  });
-
   it("상대 시간 레이블을 보여준다", () => {
     render(<BitCard bit={base} />);
-    expect(screen.getByText("방금 전")).toBeInTheDocument();
+    expect(screen.getByText(/방금 전/)).toBeInTheDocument();
   });
 
   it("본문 속 #태그를 /tags 링크로 렌더한다", () => {
@@ -76,13 +74,8 @@ describe("BitCard", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 
-  it("rebit props가 있으면 Rebit 버튼을 보여준다", () => {
-    render(<BitCard bit={base} rebit={{ count: 2, byMe: false }} />);
-    expect(screen.getByRole("button", { name: /Rebit/ })).toBeInTheDocument();
-  });
-
-  it("rebit props가 없으면 Rebit 버튼이 없다", () => {
+  it("카드에 액션 버튼(좋아요·댓글)이 있다", () => {
     render(<BitCard bit={base} />);
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button").length).toBeGreaterThanOrEqual(2);
   });
 });

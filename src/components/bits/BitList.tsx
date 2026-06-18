@@ -1,13 +1,14 @@
 import { getBitsFiltered } from "@/lib/bits";
 import { BitCard } from "./BitCard";
 import { BitActionsMenu } from "./BitActionsMenu";
+import { RebitCard } from "./RebitCard";
 
-type Props = { filterTags?: string[] };
+type Props = { filterTags?: string[]; isLoggedIn?: boolean };
 
-export async function BitList({ filterTags = [] }: Props) {
-  const bits = await getBitsFiltered(filterTags);
+export async function BitList({ filterTags = [], isLoggedIn = false }: Props) {
+  const items = await getBitsFiltered(filterTags);
 
-  if (bits.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="text-center text-muted-foreground py-12 text-sm">
         {filterTags.length > 0
@@ -18,15 +19,27 @@ export async function BitList({ filterTags = [] }: Props) {
   }
 
   return (
-    <div>
-      {bits.map((bit) => (
-        <div key={bit.id} className="relative">
-          <BitCard bit={bit} />
-          <div className="absolute right-3 top-3">
-            <BitActionsMenu bitId={bit.id} pinned={bit.pinned} />
+    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+      {items.map((item) => {
+        if (item.kind === "rebit") {
+          return (
+            <div key={item.rebitId} style={{ position: "relative" }}>
+              <RebitCard rebitAtLabel={item.rebitAtLabel} message={item.message} bit={item.bit} isLoggedIn={isLoggedIn} />
+            </div>
+          );
+        }
+
+        return (
+          <div key={item.bit.id} style={{ position: "relative" }}>
+            <BitCard bit={item.bit} isLoggedIn={isLoggedIn} />
+            {isLoggedIn && (
+              <div style={{ position: "absolute", right: "12px", top: "12px" }}>
+                <BitActionsMenu bitId={item.bit.id} pinned={item.bit.pinned} />
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

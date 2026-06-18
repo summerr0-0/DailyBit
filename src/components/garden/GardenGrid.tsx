@@ -13,12 +13,6 @@ const LEVEL_CLASS: Record<GardenLevel, string> = {
   4: "bg-green-800",
 };
 
-const AI_COLLAB_LABEL = {
-  NONE: null,
-  HINT: "AI: Hint",
-  LED: "AI: Led",
-} as const;
-
 function DayPanel({ date, bits, loading }: { date: string; bits: BitWithAuthor[]; loading: boolean }) {
   return (
     <div className="mt-4 border border-border rounded-lg overflow-hidden">
@@ -34,30 +28,20 @@ function DayPanel({ date, bits, loading }: { date: string; bits: BitWithAuthor[]
         </p>
       )}
       <ol className="divide-y divide-border">
-        {bits.map((bit) => {
-          const aiLabel = AI_COLLAB_LABEL[bit.aiCollab];
-          return (
-            <li key={bit.id} className="px-3 py-2">
-              {bit.thread && (
-                <Link
-                  href={`/threads/${bit.thread.id}`}
-                  className="text-xs text-blue-500 hover:underline block mb-0.5"
-                >
-                  {bit.thread.title}
-                </Link>
-              )}
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <span className="text-xs text-muted-foreground">{bit.createdAtLabel}</span>
-                {aiLabel && (
-                  <span className="text-xs px-1 py-0.5 rounded bg-blue-500/10 text-blue-500">
-                    {aiLabel}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs leading-relaxed line-clamp-2">{bit.content}</p>
-            </li>
-          );
-        })}
+        {bits.map((bit) => (
+          <li key={bit.id} className="px-3 py-2">
+            {bit.thread && (
+              <Link
+                href={`/threads/${bit.thread.id}`}
+                className="text-xs text-blue-500 hover:underline block mb-0.5"
+              >
+                {bit.thread.title}
+              </Link>
+            )}
+            <p className="text-xs text-muted-foreground mb-0.5">{bit.createdAtLabel}</p>
+            <p className="text-xs leading-relaxed line-clamp-2">{bit.content}</p>
+          </li>
+        ))}
       </ol>
     </div>
   );

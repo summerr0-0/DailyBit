@@ -1,4 +1,4 @@
-# Team Policies
+# Policies
 
 ## Commit Style (Conventional Commits)
 
@@ -16,7 +16,7 @@ test: 테스트
 ```
 feature/[기능명]
     ↓ git push
-PR 생성 (gh pr create)
+PR 생성 (gh pr create) — 직전에 /gemini-review 필수
     ↓ GitHub Actions CI 통과
 PR 머지 → main
     ↓
@@ -25,9 +25,10 @@ Vercel 자동 배포
 
 - `main` — production (Vercel 자동 배포, 직접 push 금지)
 - `feature/xxx` — 기능 브랜치 (PR로만 머지)
+- PR 전 `specs/<feature>/worklog.md` 작성 필수
 - PR: squash merge, 기능 단위 1개
 
-## Daily Cycle
+## 작업 흐름
 
 ```
 /new-feature
@@ -38,14 +39,9 @@ Vercel 자동 배포
     ↓
 [Claude] feature 브랜치 생성 + 구현 + 테스트
     ↓
-[Claude] gh pr create로 PR 생성
+[Claude] /gemini-review → worklog 작성 → gh pr create
     ↓
 [사람] PR 머지
     ↓
 [자동] Vercel 배포
 ```
-
-## 사람이 하는 것 (3가지)
-1. 오늘 기능 한 줄 설명
-2. 스펙 승인
-3. PR 머지

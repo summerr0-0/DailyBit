@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { deleteBit, toggleBitPin } from "@/lib/bits";
+import { requireAuth } from "@/lib/auth";
 
 export async function PATCH(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   const { id } = await params;
   const found = await toggleBitPin(id);
   if (!found) {
@@ -17,6 +21,9 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   const { id } = await params;
   if (!id) {
     return NextResponse.json({ error: "id가 필요합니다." }, { status: 400 });

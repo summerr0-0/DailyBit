@@ -113,6 +113,66 @@ export async function getGarden(): Promise<GardenData> {
   return buildGardenGrid(scoreByDate, todayKey);
 }
 
+export type GardenStats = {
+  totalBits: number;
+  curStreak: number;
+  maxStreak: number;
+};
+
+export async function getStats(): Promise<GardenStats> {
+  const me = await prisma.user.findUnique({
+    where: { email: DEV_USER.email },
+    select: { id: true },
+  });
+  if (!me) return { totalBits: 0, curStreak: 0, maxStreak: 0 };
+
+  const [totalBits, bits] = await Promise.all([
+    prisma.bit.count({ where: { authorId: me.id } }),
+    prisma.bit.findMany({
+      where: { authorId: me.id },
+      select: { createdAt: true },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
+
+  const dateKeys = [
+    ...new Set(bits.map((b) => toKstDateKey(b.createdAt))),
+  ].sort();
+
+  if (dateKeys.length === 0) return { totalBits, curStreak: 0, maxStreak: 0 };
+
+  const dateSet = new Set(dateKeys);
+
+  // Current streak — go back from today (allow yesterday if today is empty)
+  let curStreak = 0;
+  let cursor = new Date(toKstDateKey(new Date()) + "T00:00:00Z");
+  if (!dateSet.has(toKstDateKey(cursor))) {
+    cursor = new Date(cursor.getTime() - DAY_MS);
+  }
+  while (dateSet.has(toKstDateKey(cursor))) {
+    curStreak++;
+    cursor = new Date(cursor.getTime() - DAY_MS);
+  }
+
+  // Max streak — longest consecutive-day run
+  const timestamps = dateKeys.map(
+    (k) => new Date(k + "T00:00:00Z").getTime(),
+  );
+  let maxStreak = 0;
+  let run = 1;
+  for (let i = 1; i < timestamps.length; i++) {
+    if (timestamps[i] - timestamps[i - 1] === DAY_MS) {
+      run++;
+    } else {
+      if (run > maxStreak) maxStreak = run;
+      run = 1;
+    }
+  }
+  if (run > maxStreak) maxStreak = run;
+
+  return { totalBits, curStreak, maxStreak };
+}
+
 /** KST 날짜(yyyy-mm-dd)에 작성된 Bit를 최신순으로 반환한다. */
 export async function getBitsByDateKST(dateKey: string): Promise<BitWithAuthor[]> {
   const me = await prisma.user.findUnique({
@@ -139,12 +199,16 @@ export async function getBitsByDateKST(dateKey: string): Promise<BitWithAuthor[]
       createdAt: true,
       author: { select: { id: true, nickname: true, image: true } },
       thread: { select: { id: true, title: true } },
+      _count: { select: { likes: true, rebits: true, comments: true } },
     },
   });
 
-  return rows.map(({ createdAt, pinned, ...rest }) => ({
+  return rows.map(({ createdAt, pinned, _count, ...rest }) => ({
     ...rest,
     pinned: pinned ?? false,
     createdAtLabel: toRelativeLabel(createdAt),
+    likeCount: _count.likes,
+    rebitCount: _count.rebits,
+    commentCount: _count.comments,
   }));
 }

@@ -39,6 +39,9 @@ function toFeedBit(b: BitForFeed): BitWithAuthor {
     thread: b.thread,
     createdAtLabel: toRelativeLabel(b.createdAt),
     author: b.author,
+    likeCount: 0,
+    rebitCount: b._count.rebits,
+    commentCount: 0,
   };
 }
 

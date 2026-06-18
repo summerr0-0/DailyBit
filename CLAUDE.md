@@ -1,6 +1,8 @@
 # DailyBit
 
-트위터형 SNS. Next.js 16 App Router + Supabase PostgreSQL + Vercel.
+개인 개발 학습 기록 블로그. 혼자 공부하며 배운 것을 Bit로 남기고, Thread로 탐구 과정을 엮는다.
+1인 포트폴리오 블로그. Irin만 로그인해서 글쓰기. 방문자는 로그인 없이 읽기·좋아요·댓글 가능.
+팔로우 없음.
 
 ## Stack
 
@@ -16,6 +18,7 @@ src/generated/    Prisma types (auto-generated, do not edit)
 prisma/           schema.prisma (single source of truth)
 .claude/rules/    enforced constraints
 docs/             architecture & domain details
+specs/            feature specs & worklogs
 ```
 
 ## Active Rules

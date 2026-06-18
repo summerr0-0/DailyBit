@@ -56,6 +56,8 @@ model Bit {
   updatedAt DateTime  @updatedAt
 
   rebits    Rebit[]
+  likes     Like[]
+  comments  Comment[]
 
   @@map("bits")
 }
@@ -66,9 +68,31 @@ model Rebit {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   bitId     String
   bit       Bit      @relation(fields: [bitId], references: [id], onDelete: Cascade)
+  message   String?  @db.VarChar(300)
   createdAt DateTime @default(now())
 
   @@unique([userId, bitId])
   @@index([bitId])
   @@map("rebits")
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  bitId     String
+  bit       Bit      @relation(fields: [bitId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@map("likes")
+}
+
+model Comment {
+  id           String   @id @default(cuid())
+  content      String   @db.VarChar(300)
+  author       String   @default("Anonymous")
+  passwordHash String?
+  bitId        String
+  bit          Bit      @relation(fields: [bitId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@map("comments")
 }

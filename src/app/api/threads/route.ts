@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getThreads, createThread } from "@/lib/threads";
+import { requireAuth } from "@/lib/auth";
 
 export async function GET() {
   const threads = await getThreads();
@@ -12,6 +13,9 @@ const CreateThreadSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   let body: unknown;
   try {
     body = await request.json();

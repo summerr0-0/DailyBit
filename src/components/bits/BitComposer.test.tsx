@@ -10,12 +10,12 @@ describe("BitComposer", () => {
   it("textarea와 제출 버튼을 렌더링한다", () => {
     render(<BitComposer />);
     expect(screen.getByLabelText("Bit content")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Post Bit/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Post/ })).toBeInTheDocument();
   });
 
   it("내용이 비어있으면 제출 버튼이 비활성화된다", () => {
     render(<BitComposer />);
-    expect(screen.getByRole("button", { name: /Post Bit/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Post/ })).toBeDisabled();
   });
 
   it("공백만 입력하면 제출 버튼이 비활성화된다", () => {
@@ -23,7 +23,7 @@ describe("BitComposer", () => {
     fireEvent.change(screen.getByLabelText("Bit content"), {
       target: { value: "   " },
     });
-    expect(screen.getByRole("button", { name: /Post Bit/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Post/ })).toBeDisabled();
   });
 
   it("내용을 입력하면 제출 버튼이 활성화된다", () => {
@@ -31,7 +31,7 @@ describe("BitComposer", () => {
     fireEvent.change(screen.getByLabelText("Bit content"), {
       target: { value: "안녕하세요 #dailybit" },
     });
-    expect(screen.getByRole("button", { name: /Post Bit/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Post/ })).toBeEnabled();
   });
 
   it("글자 수 카운터를 보여준다", () => {
@@ -117,6 +117,6 @@ describe("BitComposer", () => {
       target: { value: "a".repeat(501) },
     });
     expect(screen.getByText("501/500").className).toContain("text-destructive");
-    expect(screen.getByRole("button", { name: /Post Bit/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Post/ })).toBeDisabled();
   });
 });

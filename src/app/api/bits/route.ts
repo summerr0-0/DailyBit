@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getBits, createBit } from "@/lib/bits";
+import { requireAuth } from "@/lib/auth";
 
 export async function GET() {
   const bits = await getBits();
@@ -14,6 +15,9 @@ const CreateBitSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   let body: unknown;
   try {
     body = await request.json();
