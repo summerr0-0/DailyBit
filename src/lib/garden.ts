@@ -196,6 +196,7 @@ export async function getBitsByDateKST(dateKey: string): Promise<BitWithAuthor[]
       tags: true,
       aiCollab: true,
       pinned: true,
+      private: true,
       createdAt: true,
       author: { select: { id: true, nickname: true, image: true } },
       thread: { select: { id: true, title: true } },

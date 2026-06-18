@@ -70,7 +70,7 @@ export default async function HomePage({ searchParams }: Props) {
                 Loading...
               </div>
             }>
-              <BitList filterTags={selectedTags} isLoggedIn={loggedIn} />
+              <BitList filterTags={selectedTags} isLoggedIn={loggedIn} includePrivate={loggedIn} />
             </Suspense>
           </div>
 
@@ -79,7 +79,7 @@ export default async function HomePage({ searchParams }: Props) {
             <Suspense fallback={
               <div style={{ background: "#FFFDF8", border: "1px solid #E8E1D2", borderRadius: "18px", height: "200px" }} />
             }>
-              <TagSidebar selectedTags={selectedTags} />
+              <TagSidebar selectedTags={selectedTags} isLoggedIn={loggedIn} />
             </Suspense>
           </div>
 

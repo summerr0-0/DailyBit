@@ -49,11 +49,21 @@ export function BitCard({ bit, isLoggedIn = false }: Props) {
       }}
       className="hover:[border-color:#E8C9A5] hover:[box-shadow:0_4px_16px_rgba(60,50,30,0.07)]"
     >
-      <div style={{ fontSize: "13px", color: "#A89E89" }}>
-        {bit.createdAtLabel}
+      <div style={{ fontSize: "13px", color: "#A89E89", display: "flex", alignItems: "center", gap: "6px" }}>
+        <span>{bit.createdAtLabel}</span>
         {bit.pinned && (
-          <span style={{ marginLeft: "8px", color: "#D4A017", fontWeight: 600 }}>
-            · Pinned
+          <span style={{ color: "#D4A017", fontWeight: 600 }}>· Pinned</span>
+        )}
+        {bit.private && (
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: "3px",
+            background: "#F4EEE4", color: "#9C4A1A", fontSize: "11px",
+            fontWeight: 600, borderRadius: "6px", padding: "1px 6px",
+          }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+            </svg>
+            Private
           </span>
         )}
       </div>

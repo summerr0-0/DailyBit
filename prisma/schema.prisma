@@ -48,6 +48,7 @@ model Bit {
   tags      String[]
   aiCollab  AiCollab  @default(NONE)
   pinned    Boolean   @default(false)
+  private   Boolean   @default(false)
   authorId  String
   author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
   threadId  String?
@@ -83,6 +84,13 @@ model Like {
   createdAt DateTime @default(now())
 
   @@map("likes")
+}
+
+model PrivateTag {
+  tag       String   @id
+  createdAt DateTime @default(now())
+
+  @@map("private_tags")
 }
 
 model Comment {

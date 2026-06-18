@@ -12,6 +12,7 @@ const CreateBitSchema = z.object({
   content: z.string().trim().min(1).max(500),
   threadId: z.string().optional(),
   aiCollab: z.enum(["NONE", "HINT", "LED"]).optional(),
+  private: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
       content: parsed.data.content,
       threadId: parsed.data.threadId,
       aiCollab: parsed.data.aiCollab,
+      private: parsed.data.private,
     });
     return NextResponse.json(bit, { status: 201 });
   } catch {

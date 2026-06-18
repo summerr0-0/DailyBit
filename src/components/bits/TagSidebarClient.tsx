@@ -1,14 +1,15 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useOptimistic, useTransition } from "react";
 
-type Tag = { tag: string; count: number };
+type Tag = { tag: string; count: number; isPrivateTag: boolean };
 
 type Props = {
   tags: Tag[];
   totalCount: number;
   selectedTags: string[];
+  isLoggedIn?: boolean;
 };
 
 const ROW_BASE: React.CSSProperties = {
@@ -27,10 +28,26 @@ const ROW_BASE: React.CSSProperties = {
   background: "transparent",
 };
 
-export function TagSidebarClient({ tags, totalCount, selectedTags }: Props) {
+function LockIcon({ size = 11 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
+      <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+    </svg>
+  );
+}
+
+export function TagSidebarClient({ tags, totalCount, selectedTags, isLoggedIn = false }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [, startTransition] = useTransition();
+
+  // Optimistic local toggle so the UI responds instantly
+  const [optimisticTags, addOptimistic] = useOptimistic(
+    tags,
+    (state, { tag, makePrivate }: { tag: string; makePrivate: boolean }) =>
+      state.map((t) => (t.tag === tag ? { ...t, isPrivateTag: makePrivate } : t)),
+  );
 
   const setTag = useCallback(
     (tag: string | null) => {
@@ -44,6 +61,23 @@ export function TagSidebarClient({ tags, totalCount, selectedTags }: Props) {
     },
     [pathname, searchParams, router],
   );
+
+  async function togglePrivateTag(tag: string, currentlyPrivate: boolean) {
+    startTransition(() => {
+      addOptimistic({ tag, makePrivate: !currentlyPrivate });
+    });
+
+    if (currentlyPrivate) {
+      await fetch(`/api/tags/private/${encodeURIComponent(tag)}`, { method: "DELETE" });
+    } else {
+      await fetch("/api/tags/private", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tag }),
+      });
+    }
+    router.refresh();
+  }
 
   const activeTag = selectedTags[0] ?? null;
   const allActive = activeTag === null;
@@ -73,23 +107,50 @@ export function TagSidebarClient({ tags, totalCount, selectedTags }: Props) {
           <span style={{ fontSize: "12.5px", color: "#B4AB97" }}>{totalCount}</span>
         </button>
 
-        {tags.map(({ tag, count }) => {
+        {optimisticTags.map(({ tag, count, isPrivateTag }) => {
           const active = activeTag === tag;
           return (
-            <button
-              key={tag}
-              onClick={() => setTag(tag)}
-              style={{
-                ...ROW_BASE,
-                background: active ? "#C96820" : "transparent",
-                color: active ? "#fff" : "#4A4438",
-              }}
-            >
-              <span>#{tag}</span>
-              <span style={{ fontSize: "12.5px", color: active ? "#F5D5B0" : "#B4AB97" }}>
-                {count}
-              </span>
-            </button>
+            <div key={tag} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+              <button
+                onClick={() => setTag(tag)}
+                style={{
+                  ...ROW_BASE,
+                  flex: 1,
+                  background: active ? "#C96820" : "transparent",
+                  color: active
+                    ? "#fff"
+                    : isPrivateTag
+                      ? "#9C6A2A"
+                      : "#4A4438",
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                  {isPrivateTag && <LockIcon />}
+                  #{tag}
+                </span>
+                <span style={{ fontSize: "12.5px", color: active ? "#F5D5B0" : "#B4AB97" }}>
+                  {count}
+                </span>
+              </button>
+
+              {/* Lock toggle — only visible to Irin */}
+              {isLoggedIn && (
+                <button
+                  type="button"
+                  title={isPrivateTag ? "Make tag public" : "Make tag private"}
+                  onClick={() => void togglePrivateTag(tag, isPrivateTag)}
+                  style={{
+                    flexShrink: 0, padding: "4px", borderRadius: "6px", border: "none",
+                    background: "none", cursor: "pointer",
+                    color: isPrivateTag ? "#C96820" : "#D0C9BC",
+                    display: "flex", alignItems: "center",
+                  }}
+                  className="hover:bg-[#FEF3E8]"
+                >
+                  <LockIcon size={12} />
+                </button>
+              )}
+            </div>
           );
         })}
       </div>

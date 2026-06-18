@@ -13,6 +13,7 @@ const base: BitWithAuthor = {
   tags: [],
   aiCollab: "NONE",
   pinned: false,
+  private: false,
   thread: null,
   createdAtLabel: "방금 전",
   likeCount: 0,

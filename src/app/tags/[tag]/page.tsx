@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { getBitsByTag, getTagCloud } from "@/lib/bits";
 import { isLoggedIn } from "@/lib/auth";
+import { isPrivateTag } from "@/lib/privateTags";
 import { BitCard } from "@/components/bits/BitCard";
 import { BitActionsMenu } from "@/components/bits/BitActionsMenu";
 
@@ -14,10 +16,15 @@ export default async function TagPage({
   const { tag } = await params;
   const normalized = tag.toLowerCase();
 
-  const [bits, tagCloud, loggedIn] = await Promise.all([
-    getBitsByTag(normalized),
-    getTagCloud(),
-    isLoggedIn(),
+  const loggedIn = await isLoggedIn();
+
+  // Gate private tags — unauthenticated visitors get 404
+  const privateTag = await isPrivateTag(normalized);
+  if (privateTag && !loggedIn) notFound();
+
+  const [bits, tagCloud] = await Promise.all([
+    getBitsByTag(normalized, loggedIn),
+    getTagCloud(loggedIn),
   ]);
 
   return (
@@ -67,7 +74,7 @@ export default async function TagPage({
                     <BitCard bit={bit} isLoggedIn={loggedIn} />
                     {loggedIn && (
                       <div style={{ position: "absolute", right: "12px", top: "12px" }}>
-                        <BitActionsMenu bitId={bit.id} pinned={bit.pinned} />
+                        <BitActionsMenu bitId={bit.id} pinned={bit.pinned} isPrivate={bit.private} />
                       </div>
                     )}
                   </div>
@@ -98,7 +105,7 @@ export default async function TagPage({
                 >
                   <span>All</span>
                 </Link>
-                {tagCloud.map(({ tag: t, count }) => {
+                {tagCloud.map(({ tag: t, count, isPrivateTag: priv }) => {
                   const active = t === normalized;
                   return (
                     <Link
@@ -108,13 +115,20 @@ export default async function TagPage({
                         display: "flex", justifyContent: "space-between", alignItems: "center",
                         padding: "8px 11px", borderRadius: "10px", fontSize: "14px",
                         fontWeight: active ? 700 : 500,
-                        color: active ? "#fff" : "#4A4438",
+                        color: active ? "#fff" : priv ? "#9C6A2A" : "#4A4438",
                         background: active ? "#C96820" : "transparent",
                         textDecoration: "none",
                       }}
                       className={active ? "" : "hover:bg-[#FEF3E8] hover:!text-[#9C4A1A]"}
                     >
-                      <span>#{t}</span>
+                      <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                        {priv && (
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                          </svg>
+                        )}
+                        #{t}
+                      </span>
                       <span style={{ fontSize: "12.5px", color: active ? "#F5D5B0" : "#B4AB97" }}>{count}</span>
                     </Link>
                   );

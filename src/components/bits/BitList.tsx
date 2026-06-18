@@ -3,10 +3,10 @@ import { BitCard } from "./BitCard";
 import { BitActionsMenu } from "./BitActionsMenu";
 import { RebitCard } from "./RebitCard";
 
-type Props = { filterTags?: string[]; isLoggedIn?: boolean };
+type Props = { filterTags?: string[]; isLoggedIn?: boolean; includePrivate?: boolean };
 
-export async function BitList({ filterTags = [], isLoggedIn = false }: Props) {
-  const items = await getBitsFiltered(filterTags);
+export async function BitList({ filterTags = [], isLoggedIn = false, includePrivate = false }: Props) {
+  const items = await getBitsFiltered(filterTags, includePrivate);
 
   if (items.length === 0) {
     return (
@@ -34,7 +34,7 @@ export async function BitList({ filterTags = [], isLoggedIn = false }: Props) {
             <BitCard bit={item.bit} isLoggedIn={isLoggedIn} />
             {isLoggedIn && (
               <div style={{ position: "absolute", right: "12px", top: "12px" }}>
-                <BitActionsMenu bitId={item.bit.id} pinned={item.bit.pinned} />
+                <BitActionsMenu bitId={item.bit.id} pinned={item.bit.pinned} isPrivate={item.bit.private} />
               </div>
             )}
           </div>

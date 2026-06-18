@@ -28,6 +28,7 @@ export type BitWithAuthor = {
   tags: string[];
   aiCollab: AiCollabLevel;
   pinned: boolean;
+  private: boolean;
   thread: { id: string; title: string } | null;
   createdAtLabel: string;
   likeCount: number;
@@ -58,6 +59,7 @@ type BitRow = {
   tags: string[];
   aiCollab: AiCollabLevel;
   pinned: boolean;
+  private: boolean;
   thread: { id: string; title: string } | null;
   createdAt: Date;
   author: { id: string; nickname: string; image: string | null };
@@ -80,14 +82,16 @@ const BIT_SELECT = {
   tags: true,
   aiCollab: true,
   pinned: true,
+  private: true,
   createdAt: true,
   author: { select: { id: true, nickname: true, image: true } },
   thread: { select: { id: true, title: true } },
   _count: { select: { likes: true, rebits: true, comments: true } },
 } as const;
 
-export async function getBits(): Promise<BitWithAuthor[]> {
+export async function getBits(includePrivate = false): Promise<BitWithAuthor[]> {
   const rows = await prisma.bit.findMany({
+    where: includePrivate ? undefined : { private: false },
     orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
     select: BIT_SELECT,
   });
@@ -95,13 +99,12 @@ export async function getBits(): Promise<BitWithAuthor[]> {
   return rows.map(toBitWithAuthor);
 }
 
-/**
- * 특정 태그가 달린 Bit를 최신순으로 조회한다.
- * 태그는 소문자로 정규화되어 저장되므로 입력도 소문자화해 매칭한다.
- */
-export async function getBitsByTag(tag: string): Promise<BitWithAuthor[]> {
+export async function getBitsByTag(tag: string, includePrivate = false): Promise<BitWithAuthor[]> {
   const rows = await prisma.bit.findMany({
-    where: { tags: { has: tag.toLowerCase() } },
+    where: {
+      tags: { has: tag.toLowerCase() },
+      ...(includePrivate ? {} : { private: false }),
+    },
     orderBy: { createdAt: "desc" },
     select: BIT_SELECT,
   });
@@ -114,12 +117,13 @@ export async function getBitsByTag(tag: string): Promise<BitWithAuthor[]> {
  * - 태그 필터 적용 시 Rebit는 제외(원본 Bit 기준)하고 Bit만 필터링.
  * - 태그 없으면 Bit(핀 우선) + Rebit(최신순) 병합 후 날짜순 정렬.
  */
-export async function getBitsFiltered(filterTags: string[]): Promise<FeedItem[]> {
+export async function getBitsFiltered(filterTags: string[], includePrivate = false): Promise<FeedItem[]> {
   const normalized = filterTags.map((t) => t.toLowerCase()).filter(Boolean);
+  const privacyFilter = includePrivate ? {} : { private: false };
 
   if (normalized.length > 0) {
     const rows = await prisma.bit.findMany({
-      where: { AND: normalized.map((tag) => ({ tags: { has: tag } })) },
+      where: { AND: [privacyFilter, ...normalized.map((tag) => ({ tags: { has: tag } }))] },
       orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
       select: BIT_SELECT,
     });
@@ -130,6 +134,7 @@ export async function getBitsFiltered(filterTags: string[]): Promise<FeedItem[]>
 
   const [bitRows, rebitRows] = await Promise.all([
     prisma.bit.findMany({
+      where: privacyFilter,
       orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
       select: BIT_SELECT,
     }),
@@ -183,19 +188,36 @@ export async function getBitsFiltered(filterTags: string[]): Promise<FeedItem[]>
   return [...pinned, ...merged];
 }
 
-/** 전체 Bit에서 태그 사용 빈도를 내림차순으로 반환한다. */
-export async function getTagCloud(): Promise<{ tag: string; count: number }[]> {
-  const rows = await prisma.bit.findMany({ select: { tags: true } });
+export async function getTagCloud(
+  includePrivate = false,
+): Promise<{ tag: string; count: number; isPrivateTag: boolean }[]> {
+  const [rows, privateTagRows] = await Promise.all([
+    prisma.bit.findMany({
+      where: includePrivate ? undefined : { private: false },
+      select: { tags: true },
+    }),
+    prisma.privateTag.findMany({ select: { tag: true } }),
+  ]);
+
+  const privateTags = new Set(privateTagRows.map((r) => r.tag));
 
   const counts = new Map<string, number>();
   for (const { tags } of rows) {
     for (const tag of tags) {
+      if (!includePrivate && privateTags.has(tag)) continue;
       counts.set(tag, (counts.get(tag) ?? 0) + 1);
     }
   }
 
+  // When logged in, also include private tags even if they have 0 public bits
+  if (includePrivate) {
+    for (const tag of privateTags) {
+      if (!counts.has(tag)) counts.set(tag, 0);
+    }
+  }
+
   return Array.from(counts.entries())
-    .map(([tag, count]) => ({ tag, count }))
+    .map(([tag, count]) => ({ tag, count, isPrivateTag: privateTags.has(tag) }))
     .sort((a, b) => b.count - a.count);
 }
 
@@ -208,6 +230,7 @@ export async function createBit(input: {
   content: string;
   threadId?: string;
   aiCollab?: AiCollabLevel;
+  private?: boolean;
 }): Promise<BitWithAuthor> {
   const author = await ensureDevUser();
 
@@ -216,6 +239,7 @@ export async function createBit(input: {
       content: input.content,
       tags: parseTags(input.content),
       authorId: author.id,
+      private: input.private ?? false,
       ...(input.threadId ? { threadId: input.threadId } : {}),
       ...(input.aiCollab ? { aiCollab: input.aiCollab } : {}),
     },
@@ -251,6 +275,14 @@ export async function toggleRebit(
     data: { userId: author.id, bitId, message: message?.trim() || null },
   });
   return "created";
+}
+
+/** Bit의 private 상태를 토글한다. 대상이 없으면 false 반환. */
+export async function toggleBitPrivate(id: string): Promise<boolean> {
+  const bit = await prisma.bit.findUnique({ where: { id }, select: { private: true } });
+  if (!bit) return false;
+  await prisma.bit.update({ where: { id }, data: { private: !bit.private } });
+  return true;
 }
 
 /** Bit의 pinned 상태를 토글한다. 대상이 없으면 false 반환. */
