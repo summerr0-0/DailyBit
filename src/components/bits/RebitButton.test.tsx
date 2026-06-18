@@ -32,12 +32,18 @@ describe("RebitButton", () => {
     expect(screen.getByRole("button")).toHaveTextContent("2");
   });
 
-  it("클릭하면 POST /api/bits/:id/rebit을 호출한다", async () => {
+  it("클릭하면 모달이 열리고 확인하면 POST /api/bits/:id/rebit을 호출한다", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", fetchMock);
 
     render(<RebitButton bitId="b1" rebitCount={0} isLoggedIn={true} />);
-    fireEvent.click(screen.getByRole("button"));
+
+    // First click opens the modal
+    fireEvent.click(screen.getByRole("button", { name: "Rebit" }));
+
+    // Modal is now open — click the confirm Rebit button (last one with name "Rebit")
+    const rebitButtons = screen.getAllByRole("button", { name: /^Rebit$/ });
+    fireEvent.click(rebitButtons[rebitButtons.length - 1]);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(fetchMock).toHaveBeenCalledWith(

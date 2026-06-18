@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { BitComposer } from "./BitComposer";
 
@@ -85,20 +85,10 @@ describe("BitComposer", () => {
     vi.unstubAllGlobals();
   });
 
-  it("입력 중 #태그를 소문자·중복제거하여 미리보기로 보여준다", () => {
+  it("태그 미리보기를 렌더링하지 않는다 (태그는 본문 인라인으로만 표시)", () => {
     render(<BitComposer />);
     fireEvent.change(screen.getByLabelText("Bit content"), {
-      target: { value: "공부 중 #React #react #DevLog" },
-    });
-    const preview = screen.getByLabelText("Tag preview");
-    expect(within(preview).getAllByText("#react")).toHaveLength(1);
-    expect(within(preview).getByText("#devlog")).toBeInTheDocument();
-  });
-
-  it("태그가 없으면 미리보기를 렌더링하지 않는다", () => {
-    render(<BitComposer />);
-    fireEvent.change(screen.getByLabelText("Bit content"), {
-      target: { value: "태그 없는 본문" },
+      target: { value: "공부 중 #React #DevLog" },
     });
     expect(screen.queryByLabelText("Tag preview")).not.toBeInTheDocument();
   });
