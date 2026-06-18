@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { BitList } from "@/components/bits/BitList";
 import { BitComposer } from "@/components/bits/BitComposer";
 import { ProfileCard } from "@/components/profile/ProfileCard";
@@ -56,12 +57,12 @@ export default async function HomePage({ searchParams }: Props) {
                 <span style={{ fontSize: "13.5px", color: "#9C4A1A" }}>
                   Showing #{selectedTags.join(", #")}
                 </span>
-                <a
+                <Link
                   href="/"
                   style={{ fontSize: "13px", color: "#9C4A1A", fontWeight: 600, textDecoration: "none" }}
                 >
                   Show all ✕
-                </a>
+                </Link>
               </div>
             )}
 

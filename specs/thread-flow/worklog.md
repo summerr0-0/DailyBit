@@ -94,3 +94,23 @@ Portfolio targets English-speaking interviewers; localized all user-facing Korea
 - `src/components/bits/BitList.tsx` — empty state messages
 - `src/components/bits/TagFilterBar.tsx` — "Skill Tags" header, "Clear filter" button
 - `docs/backlog.md` — removed SNS items (Like, Follow, Notifications, Mention, Bookmark, Quote Rebit)
+
+---
+
+## CI Fix (post-merge)
+
+After #18 merged, CI was failing on `feature/thread-flow` with lint errors and stale e2e tests.
+
+### Root causes
+- `src/app/page.tsx`: `<a href="/">` violated `@next/next/no-html-link-for-pages` ESLint rule
+- `src/components/bits/BitComposer.tsx`: unused `tags` variable and `parseTags` import
+- `src/components/profile/ProfileCard.tsx`: unused `Link` import
+- `e2e/feed.spec.ts`: three tests stale after portfolio UI redesign:
+  - "DailyBit" heading check → UI uses span, not heading element
+  - "devuser" author check → author no longer shown in BitCard
+  - `getByText("#dailybit", { exact: true })` → strict mode violation (2 elements matched)
+
+### Fixes
+- Replaced `<a>` with `<Link>` and added `next/link` import in `page.tsx`
+- Removed unused vars/imports in `BitComposer` and `ProfileCard`
+- Updated e2e: heading→"one small bit a day" tagline, devuser→"Irin Jeong" (ProfileCard), #dailybit→`getByRole("link").first()`
