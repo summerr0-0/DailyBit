@@ -139,7 +139,10 @@ export async function getBitsFiltered(filterTags: string[], includePrivate = fal
       select: BIT_SELECT,
     }),
     prisma.rebit.findMany({
-      where: { userId: author.id },
+      where: {
+        userId: author.id,
+        ...(includePrivate ? {} : { bit: { private: false } }),
+      },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
