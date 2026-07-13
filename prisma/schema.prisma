@@ -13,6 +13,12 @@ enum AiCollab {
   LED
 }
 
+enum SourceType {
+  URL
+  TEXT
+  YOUTUBE
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -22,9 +28,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bits      Bit[]
-  rebits    Rebit[]
-  threads   Thread[]
+  bits        Bit[]
+  rebits      Rebit[]
+  threads     Thread[]
+  scrapDrafts ScrapDraft[]
 
   @@map("users")
 }
@@ -103,4 +110,24 @@ model Comment {
   createdAt    DateTime @default(now())
 
   @@map("comments")
+}
+
+// 테크 글 스크랩 초안. 컨펌 발행 전까지만 존재하는 임시 데이터(비공개, 오너 전용).
+// segments = 발행 후보 배열 [{ content: string(≤500), tags: string[] }].
+// 세그먼트 1개면 Bit, 2개 이상이면 Thread로 발행 후 이 행은 삭제된다.
+model ScrapDraft {
+  id                   String     @id @default(cuid())
+  sourceType           SourceType
+  sourceUrl            String?
+  sourceTitle          String?
+  rawExtract           String     @db.Text
+  segments             Json
+  suggestedThreadTitle String?    @db.VarChar(100)
+  authorId             String
+  author               User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@index([authorId])
+  @@map("scrap_drafts")
 }
