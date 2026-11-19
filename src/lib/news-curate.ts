@@ -8,6 +8,8 @@ import type {
   EventNewsResult,
   EventScoreResult,
   KnownEvent,
+  MergeInput,
+  MergeResult,
   ScoreInput,
   ScoreOptions,
   SourcePointInput,
@@ -63,7 +65,7 @@ export type FeedItemRow = {
 
 export type NewFeedItem = Omit<FeedItemRow, "id" | "attempts"> & { skipReason?: string | null };
 
-export type FeedItemPatch = Partial<Pick<FeedItemRow, "status" | "attempts">> & { skipReason?: string | null };
+export type FeedItemPatch = Partial<Pick<FeedItemRow, "status" | "attempts" | "eventKey">> & { skipReason?: string | null };
 
 export type EventStatus = "OPEN" | "PUBLISHED" | "DISCARDED" | "EXPIRED";
 export type RecentEvent = { eventKey: string; title: string; status: EventStatus };
@@ -136,6 +138,8 @@ export interface CurationDeps {
   generateEvent: (input: EventNewsInput) => Promise<EventNewsResult>;
   generateConcept: (input: ConceptInput) => Promise<ConceptResult>;
   generateSourcePoint: (input: SourcePointInput) => Promise<SourcePointResult>;
+  /** 작성 전 사건 병합 확인 (Haiku 1회). 없으면 건너뛴다. */
+  mergeEvents?: (input: MergeInput) => Promise<MergeResult>;
   now?: () => Date;
   log?: (line: string) => void;
 }
@@ -362,8 +366,34 @@ export async function runCuration(deps: CurationDeps): Promise<CurationSummary> 
     }
   }
 
-  const groups = groupByEvent(await store.findPool());
+  let groups = groupByEvent(await store.findPool());
   const eventStatus = new Map(recentEvents.map((e) => [e.eventKey, e.status]));
+
+  // 4.5 작성 전 병합 확인: 채점 때 따로 키가 붙은 같은 사건(예: 같은 패치의 다른 CVE 기사)을 합친다.
+  // 새 사건 후보 상위 15개 + 인박스의 열린 사건을 Haiku 1회로 확인. 실패하면 그대로 진행한다.
+  const newCandidates = groups.filter((g) => !eventStatus.has(g.eventKey)).slice(0, 15);
+  const openEvents = recentEvents.filter((e) => e.status === "OPEN").map((e) => ({ eventKey: e.eventKey, title: e.title }));
+  if (deps.mergeEvents && newCandidates.length > 0 && newCandidates.length + openEvents.length >= 2) {
+    const merged = await deps.mergeEvents({
+      candidates: newCandidates.map((g) => ({ eventKey: g.eventKey, titles: g.items.map((i) => i.title) })),
+      openEvents,
+    });
+    if (merged.ok && merged.merges.length > 0) {
+      const into = new Map(merged.merges.map((m) => [m.from, m.into]));
+      for (const g of groups) {
+        const target = into.get(g.eventKey);
+        if (!target) continue;
+        log(`event merge ${g.eventKey} -> ${target}`);
+        for (const item of g.items) {
+          item.eventKey = target;
+          await store.updateFeedItem(item.id, { eventKey: target });
+        }
+      }
+      groups = groupByEvent(groups.flatMap((g) => g.items));
+    } else if (!merged.ok) {
+      log("event merge check failed — continuing without it");
+    }
+  }
 
   // 5. 늦은 출처 (v2 D8, D14-4/6/7): 사건 슬롯을 쓰지 않는다. 이미 있는 사건 키는 새 사건으로 쓰지 않는다.
   let lateCalls = 0;

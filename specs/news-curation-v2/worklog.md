@@ -13,3 +13,10 @@
 - Gemini diff 리뷰 12건 → 10 반영(발행 원자적 선점, 초안 후 개념 오류가 기사 되돌리지 않음, 오래된 사건 키 사전 확인, 별칭 저장, 제목을 비신뢰 블록 안으로 등), 2건 알려진 한계(동시 발행 링크 누락 경합, 인박스 배지 즉시 갱신)
 - 실측: 운영 GPT-6.2 두 출처 원문으로 로컬 CLI 실행 → 종합 Thread 1건 + 개념 "cached input" 설명 정상
 - 검증: unit 249, tsc, eslint, dry-run
+
+## 2026-11-20 운영 반영 + 사건 묶기 개선
+- 운영 DB 추가 전용 SQL 적용(DROP 0, 차이 0 확인) 후 #26 머지(`5479057`). 첫 실행: 사건 3건(TfL 유출, PHP phpAfterShell, PHP 7개 취약점) + 개념 2건(gadget chain, deserialization)
+- **Vercel 운영 배포가 #26에서 실패**(19:07Z) — 로컬 `pnpm build`는 성공. 그 사이 오너가 옛 코드(#25)로 발행 → NewsEvent가 OPEN·없는 draftId로 남음, 개념 링크 훅 미실행
+- 사용자 지적: PHP 두 건(+v1 BleepingComputer "18 flaws")이 같은 PHP 보안 릴리스 → 사건 묶기 개선 (`fix/event-grouping`)
+  - 채점 프롬프트: "한 릴리스·패치 묶음은 기사가 다른 부분을 다뤄도 하나의 사건, 키는 릴리스 이름으로" + PHP 예시 → 실측: 두 PHP 기사가 `php-security-release-2026-11`로 묶임
+  - 작성 전 병합 확인 `mergeEvents`(Haiku 1회): 새 사건 후보 상위 15 + 인박스 열린 사건 → 합칠 쌍, 체인 펼침, 실패 시 그대로 진행 → 실측: PHP 3건만 병합, TfL·OpenAI·Anthropic은 유지
