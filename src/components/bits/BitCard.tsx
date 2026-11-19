@@ -1,57 +1,10 @@
-import type { ReactNode } from "react";
 import Link from "next/link";
-import { TAG_PATTERN } from "@/lib/tags";
-import { splitByUrls } from "@/lib/linkify";
+import { renderBitContent } from "./bit-content";
 import type { BitWithAuthor } from "@/lib/bits";
 import { RebitButton } from "./RebitButton";
 import { LikeButton } from "./LikeButton";
 import { CommentSection } from "./CommentSection";
 import { ThreadReplyButton } from "./ThreadReplyButton";
-
-function renderTags(text: string, offset: number): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  let lastIndex = 0;
-
-  for (const match of text.matchAll(TAG_PATTERN)) {
-    const start = match.index ?? 0;
-    const full = match[0];
-    const name = match[1];
-
-    if (start > lastIndex) nodes.push(text.slice(lastIndex, start));
-    nodes.push(
-      <Link
-        key={offset + start}
-        href={`/tags/${name.toLowerCase()}`}
-        style={{ color: "#B05A18", fontWeight: 600 }}
-      >
-        {full}
-      </Link>,
-    );
-    lastIndex = start + full.length;
-  }
-
-  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
-  return nodes;
-}
-
-// URL 구간을 먼저 떼어낸 뒤 나머지 텍스트에서만 #태그를 링크로 만든다 (spec D13).
-function renderContent(content: string): ReactNode[] {
-  return splitByUrls(content).flatMap<ReactNode>((segment) =>
-    segment.type === "url"
-      ? [
-          <a
-            key={segment.start}
-            href={segment.value}
-            target="_blank"
-            rel="noopener noreferrer nofollow"
-            style={{ color: "#B05A18", textDecoration: "underline", wordBreak: "break-all" }}
-          >
-            {segment.value}
-          </a>,
-        ]
-      : renderTags(segment.value, segment.start),
-  );
-}
 
 type Props = { bit: BitWithAuthor; isLoggedIn?: boolean };
 
@@ -98,7 +51,7 @@ export function BitCard({ bit, isLoggedIn = false }: Props) {
       )}
 
       <p style={{ marginTop: "5px", fontSize: "15.5px", lineHeight: 1.68, color: "#33302A", whiteSpace: "pre-wrap" }}>
-        {renderContent(bit.content)}
+        {renderBitContent(bit.content)}
       </p>
 
       {/* Action bar — flex-wrap so comment panel falls to next row */}

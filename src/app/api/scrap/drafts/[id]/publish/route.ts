@@ -9,6 +9,12 @@ import { publishDraft } from "@/lib/scrap-drafts";
 const PublishSchema = z.object({
   segments: z.array(z.string().trim().min(1).max(500)).min(1),
   threadTitle: z.string().trim().max(100).nullable().optional(),
+  // 화면이 받은 초안 updatedAt (ISO). 서버 값과 다르면 409 (spec: news-curation-v2 D8, R7.1)
+  expectedUpdatedAt: z
+    .string()
+    .refine((v) => !Number.isNaN(Date.parse(v)), "invalid date")
+    .nullable()
+    .optional(),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -27,7 +33,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const parsed = PublishSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "각 세그먼트는 1~500자여야 합니다." },
+      { error: "각 세그먼트는 1~500자여야 합니다. (expectedUpdatedAt은 ISO 날짜)" },
       { status: 400 },
     );
   }
@@ -35,11 +41,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const result = await publishDraft(id, {
     segments: parsed.data.segments,
     threadTitle: parsed.data.threadTitle,
+    expectedUpdatedAt: parsed.data.expectedUpdatedAt ? new Date(parsed.data.expectedUpdatedAt) : null,
   });
 
   if (!result.ok) {
     if (result.reason === "not_found") {
       return NextResponse.json({ error: "초안을 찾을 수 없습니다." }, { status: 404 });
+    }
+    if (result.reason === "stale") {
+      return NextResponse.json({ error: "stale" }, { status: 409 });
     }
     if (result.reason === "too_long") {
       return NextResponse.json(

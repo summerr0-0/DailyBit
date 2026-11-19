@@ -3,15 +3,18 @@ import {
   AllFeedsFailedError,
   ScoringUnavailableError,
   createMemoryStore,
+  groupByEvent,
+  planConcepts,
   roundRobinBySource,
   runCuration,
-  selectForDrafting,
+  type ConceptRow,
   type CurationDeps,
   type FeedItemRow,
 } from "./news-curate";
 import type { NewsSource } from "./news-sources";
 import type { FeedEntry, FeedResult } from "./news-feed";
 import { FeedFetchError } from "./news-feed";
+import type { EventNewsInput } from "./news-ai";
 
 const NOW = new Date("2026-11-18T21:00:00Z");
 const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3600_000);
@@ -38,29 +41,55 @@ function row(over: Partial<FeedItemRow> & { id: string; sourceId: string }): Fee
     score: 7,
     status: "CANDIDATE",
     attempts: 0,
+    eventKey: null,
     ...over,
   };
 }
 
-function makeDeps(opts: {
+type Opts = {
   feeds?: FeedResult[];
   initial?: FeedItemRow[];
-  scores?: (keys: string[]) => Record<string, number> | null;
-  generate?: CurationDeps["generate"];
+  seed?: Parameters<typeof createMemoryStore>[1];
+  /** key → [score, event]. 기본: 7점, 기사마다 다른 사건 */
+  scores?: (keys: string[]) => Record<string, [number, string]> | null;
+  concepts?: { term: string; aliases: string[] }[];
+  generateEvent?: CurationDeps["generateEvent"];
+  generateConcept?: CurationDeps["generateConcept"];
   extract?: CurationDeps["extract"];
-}) {
-  const mem = createMemoryStore(opts.initial);
-  const score = vi.fn(async (items: { key: string }[]) => {
-    const s = (opts.scores ?? ((keys) => Object.fromEntries(keys.map((k) => [k, 7]))))(items.map((i) => i.key));
-    return s ? { ok: true as const, scores: s } : { ok: false as const };
+};
+
+function makeDeps(opts: Opts) {
+  const mem = createMemoryStore(opts.initial, opts.seed);
+  const score = vi.fn(async (items: { key: string }[], _o: { knownEvents?: { eventKey: string }[] }) => {
+    void _o;
+    const def = (keys: string[]) => Object.fromEntries(keys.map((k) => [k, [7, `ev-${k.split("/").pop()}`] as [number, string]]));
+    const s = (opts.scores ?? def)(items.map((i) => i.key));
+    if (!s) return { ok: false as const };
+    const results = Object.fromEntries(Object.entries(s).map(([k, [score, event]]) => [k, { score, event }]));
+    const scores = Object.fromEntries(Object.entries(s).map(([k, [score]]) => [k, score]));
+    return { ok: true as const, results, scores };
   });
-  const generate = vi.fn(
-    opts.generate ??
-      (async () => ({
+  const generateEvent = vi.fn(
+    opts.generateEvent ??
+      (async (input: EventNewsInput) => ({
         ok: true as const,
-        output: { headline: "Headline", bullets: ["Fact one.", "Fact two.", "Fact three."], tags: ["ai"] },
+        output: {
+          headline: `Headline ${input.eventTitle}`,
+          bullets: ["Fact one.", "Fact two.", "Fact three."],
+          sources: input.sources.map((_, index) => ({ index, point: `Point ${index}.` })),
+          tags: ["ai"],
+          concepts: opts.concepts ?? [],
+        },
       })),
   );
+  const generateConcept = vi.fn(
+    opts.generateConcept ??
+      (async ({ term }: { term: string }) => ({
+        ok: true as const,
+        output: { definition: `${term} defined.`, whyItMatters: "Because.", aliases: [] },
+      })),
+  );
+  const generateSourcePoint = vi.fn(async () => ({ ok: true as const, point: "Late point." }));
   const deps: CurationDeps = {
     store: mem.store,
     sources: SOURCES,
@@ -68,115 +97,273 @@ function makeDeps(opts: {
     fetchAll: async () => opts.feeds ?? [],
     extract: opts.extract ?? (async () => ({ ok: true, rawExtract: BODY })),
     score,
-    generate,
+    generateEvent,
+    generateConcept,
+    generateSourcePoint,
   };
-  return { deps, mem, score, generate };
+  return { deps, mem, score, generateEvent, generateConcept, generateSourcePoint };
 }
 
-const statusOf = (mem: ReturnType<typeof createMemoryStore>, slug: string) =>
+const itemOf = (mem: ReturnType<typeof createMemoryStore>, slug: string) =>
   [...mem.items.values()].find((i) => i.urlNormalized.endsWith(`/${slug}`));
+const newsDrafts = (mem: ReturnType<typeof createMemoryStore>) => mem.drafts.filter((d) => d.kind === "NEWS");
 
-describe("runCuration — happy path (R0.1)", () => {
-  it("creates at most 3 drafts, one per source, with the normalized URL in the body", async () => {
+describe("event threads (v2 R0.1, R3)", () => {
+  it("merges two sources about the same event into one Thread draft (D13a)", async () => {
     const feeds: FeedResult[] = [
-      { sourceId: "openai", items: [entry("o1", hoursAgo(1)), entry("o2", hoursAgo(2))] },
-      { sourceId: "krebs", items: [entry("k1", hoursAgo(3))] },
-      { sourceId: "willison", items: [entry("w1", hoursAgo(4))] },
-      { sourceId: "schneier", items: [entry("s1", hoursAgo(5))] },
+      { sourceId: "openai", items: [entry("o1", hoursAgo(1))] },
+      { sourceId: "willison", items: [entry("w1", hoursAgo(2))] },
     ];
-    const { deps, mem } = makeDeps({ feeds });
+    const { deps, mem, generateEvent } = makeDeps({
+      feeds,
+      scores: (keys) => Object.fromEntries(keys.map((k, i) => [k, [9 - i, "OpenAI GPT 6.2"]])),
+    });
     const summary = await runCuration(deps);
 
-    expect(summary.drafted).toBe(3);
-    expect(mem.drafts).toHaveLength(3);
-    const sources = mem.drafts.map((d) => d.sourceLabel);
-    expect(new Set(sources).size).toBe(3);
-    expect(mem.drafts[0].content).toContain("https://news.example/o1\n");
-    expect(mem.drafts[0].content).not.toContain("utm_source");
+    expect(summary.drafted).toBe(1);
+    expect(generateEvent).toHaveBeenCalledTimes(1);
+    const [draft] = newsDrafts(mem);
+    expect(draft.eventKey).toBe("openai-gpt-6-2");
+    expect(draft.segments).toHaveLength(3);
+    expect(draft.segments[0]).not.toContain("https://");
+    expect(draft.segments[1]).toContain("Source: OPENAI — Point 0.");
+    expect(draft.segments[1]).toContain("https://news.example/o1");
+    expect(draft.segments[1]).not.toContain("utm_source");
+    expect(draft.segments[2]).toContain("Source: WILLISON");
+    expect(mem.events.get("openai-gpt-6-2")?.status).toBe("OPEN");
+    expect(itemOf(mem, "o1")).toMatchObject({ status: "DRAFTED", eventKey: "openai-gpt-6-2" });
+    expect(itemOf(mem, "w1")).toMatchObject({ status: "DRAFTED", eventKey: "openai-gpt-6-2" });
+  });
+
+  it("publishes a single-source event as a Thread too (R3.3)", async () => {
+    const { deps, mem } = makeDeps({ feeds: [{ sourceId: "krebs", items: [entry("k", hoursAgo(1))] }] });
+    await runCuration(deps);
+    expect(newsDrafts(mem)[0].segments).toHaveLength(2);
+  });
+
+  it("caps at 3 events and 3 sources per event (R2.1)", async () => {
+    const feeds: FeedResult[] = [
+      { sourceId: "openai", items: ["a1", "a2", "a3", "a4"].map((s) => entry(s, hoursAgo(1))) },
+      { sourceId: "krebs", items: ["b", "c", "d", "e"].map((s) => entry(s, hoursAgo(1))) },
+    ];
+    const { deps, mem, generateEvent } = makeDeps({
+      feeds,
+      scores: (keys) =>
+        Object.fromEntries(
+          keys.map((k) => {
+            const slug = k.split("/").pop()!;
+            return [k, [slug === "e" ? 5 : 8, slug.startsWith("a") ? "event-a" : `event-${slug}`]];
+          }),
+        ),
+    });
+    await runCuration(deps);
+    expect(generateEvent).toHaveBeenCalledTimes(3);
+    expect(generateEvent.mock.calls[0][0].sources.length).toBeLessThanOrEqual(3);
+    expect(newsDrafts(mem).find((d) => d.eventKey === "event-a")?.segments).toHaveLength(4); // 요약 + 출처 3
+  });
+
+  it("skips an event whose sources all lack content without using a slot (R2.3)", async () => {
+    const feeds: FeedResult[] = [
+      { sourceId: "openai", items: [entry("thin", hoursAgo(1))] },
+      { sourceId: "krebs", items: ["k1", "k2", "k3"].map((s) => entry(s, hoursAgo(1))) },
+    ];
+    const { deps, generateEvent, mem } = makeDeps({
+      feeds,
+      scores: (keys) => Object.fromEntries(keys.map((k) => [k, [k.endsWith("/thin") ? 9 : 7, `ev-${k.split("/").pop()}`]])),
+      extract: async (url) => (url.includes("/thin") ? { ok: false } : { ok: true, rawExtract: BODY }),
+    });
+    await runCuration(deps);
+    expect(itemOf(mem, "thin")).toMatchObject({ status: "SKIPPED", skipReason: "no_content" });
+    expect(generateEvent).toHaveBeenCalledTimes(3);
+  });
+
+  it("spends the slot on a failed event write and marks its sources FAILED (R2.4)", async () => {
+    const generateEvent = vi.fn(async () => ({ ok: false as const, reason: "ai_failed" as const }));
+    const feeds: FeedResult[] = [{ sourceId: "openai", items: ["x", "y", "z", "w"].map((s) => entry(s, hoursAgo(1))) }];
+    const { deps, mem } = makeDeps({ feeds, generateEvent });
+    await runCuration(deps);
+    expect(generateEvent).toHaveBeenCalledTimes(3);
+    expect([...mem.items.values()].filter((i) => i.status === "FAILED")).toHaveLength(3);
+  });
+
+  it("adds number warnings against the combined source text (R3.4)", async () => {
+    const { deps, mem } = makeDeps({
+      feeds: [{ sourceId: "openai", items: [entry("o", hoursAgo(1))] }],
+      generateEvent: async () => ({
+        ok: true,
+        output: { headline: "40% faster", bullets: ["1,200 users hit.", "Second fact."], sources: [], tags: ["ai"], concepts: [] },
+      }),
+    });
+    await runCuration(deps);
+    expect(newsDrafts(mem)[0].warnings).toContain("number_not_in_source:40");
+    expect(newsDrafts(mem)[0].warnings).not.toContain("number_not_in_source:1200");
   });
 });
 
-describe("dedup (R2.4, R3.3)", () => {
-  it("ignores URLs already stored in any status, even with tracking params", async () => {
+describe("known events and late sources (v2 D1, D8, R5)", () => {
+  it("passes recent events to the scorer (R1.1)", async () => {
+    const { deps, score } = makeDeps({
+      feeds: [{ sourceId: "openai", items: [entry("n", hoursAgo(1))] }],
+      seed: { events: [{ eventKey: "old-event", title: "Old", status: "PUBLISHED", draftId: null, updatedAt: hoursAgo(10) }] },
+    });
+    await runCuration(deps);
+    expect(score.mock.calls[0][1].knownEvents?.map((e) => e.eventKey)).toContain("old-event");
+  });
+
+  it("appends a late source to an open event draft without using an event slot (R5.1)", async () => {
+    const first = makeDeps({ feeds: [{ sourceId: "openai", items: [entry("o1", hoursAgo(3))] }], scores: (k) => ({ [k[0]]: [9, "gpt"] }) });
+    await runCuration(first.deps);
+    const { mem } = first;
+    const second = {
+      ...first.deps,
+      fetchAll: async () => [{ sourceId: "willison", items: [entry("w1", hoursAgo(1))] }] as FeedResult[],
+    };
+    await runCuration(second);
+    const draft = newsDrafts(mem)[0];
+    expect(draft.segments).toHaveLength(3);
+    expect(draft.segments[2]).toContain("Source: WILLISON — Late point.");
+    expect(draft.warnings).toContain("source_added_later");
+    expect(first.generateEvent).toHaveBeenCalledTimes(1);
+    expect(first.generateSourcePoint).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips late articles of a closed event (R5.2, D13e)", async () => {
+    const { deps, mem, generateEvent } = makeDeps({
+      feeds: [{ sourceId: "willison", items: [entry("w1", hoursAgo(1))] }],
+      scores: (k) => ({ [k[0]]: [8, "gpt"] }),
+      seed: { events: [{ eventKey: "gpt", title: "GPT", status: "PUBLISHED", draftId: null, updatedAt: hoursAgo(5) }] },
+    });
+    await runCuration(deps);
+    expect(itemOf(mem, "w1")).toMatchObject({ status: "SKIPPED", skipReason: "event_closed" });
+    expect(generateEvent).not.toHaveBeenCalled();
+  });
+
+  it("skips late articles when the event already has 3 sources (R5.2)", async () => {
+    const feeds: FeedResult[] = [{ sourceId: "openai", items: ["s1", "s2", "s3"].map((s) => entry(s, hoursAgo(2))) }];
+    const first = makeDeps({ feeds, scores: (keys) => Object.fromEntries(keys.map((k) => [k, [8, "big"]])) });
+    await runCuration(first.deps);
+    await runCuration({
+      ...first.deps,
+      fetchAll: async () => [{ sourceId: "krebs", items: [entry("s4", hoursAgo(1))] }] as FeedResult[],
+    });
+    expect(itemOf(first.mem, "s4")).toMatchObject({ status: "SKIPPED", skipReason: "event_full" });
+  });
+});
+
+describe("concepts (v2 R4)", () => {
+  const published: ConceptRow = {
+    id: "c1",
+    slug: "quantization",
+    term: "Quantization",
+    aliases: ["4-bit quantization"],
+    status: "PUBLISHED",
+    draftId: null,
+  };
+
+  it("reuses an existing concept via alias without a new draft (R4.1)", async () => {
+    const { deps, mem, generateConcept } = makeDeps({
+      feeds: [{ sourceId: "openai", items: [entry("o", hoursAgo(1))] }],
+      concepts: [{ term: "4-bit Quantization", aliases: [] }],
+      seed: { concepts: [published] },
+    });
+    await runCuration(deps);
+    expect(generateConcept).not.toHaveBeenCalled();
+    expect(newsDrafts(mem)[0].conceptSlugs).toEqual(["quantization"]);
+    expect(mem.conceptEvents.size).toBe(1);
+  });
+
+  it("creates one concept draft and does not repeat it on the next run (R4.2, R4.3, D13d)", async () => {
+    const { deps, mem, generateConcept } = makeDeps({
+      feeds: [{ sourceId: "openai", items: [entry("o", hoursAgo(1))] }],
+      concepts: [{ term: "Prompt Injection", aliases: [] }],
+    });
+    await runCuration(deps);
+    await runCuration({
+      ...deps,
+      fetchAll: async () => [{ sourceId: "krebs", items: [entry("k", hoursAgo(1))] }] as FeedResult[],
+    });
+    expect(generateConcept).toHaveBeenCalledTimes(1);
+    expect(mem.drafts.filter((d) => d.kind === "CONCEPT")).toHaveLength(1);
+    expect(mem.concepts.get("promptinjection")?.status).toBe("PENDING");
+  });
+
+  it("leaves a failed concept PENDING without a draft while the news draft is created (R4.6)", async () => {
+    const { deps, mem } = makeDeps({
+      feeds: [{ sourceId: "openai", items: [entry("o", hoursAgo(1))] }],
+      concepts: [{ term: "Distillation", aliases: [] }],
+      generateConcept: async () => ({ ok: false, reason: "ai_failed" }),
+    });
+    await runCuration(deps);
+    expect(newsDrafts(mem)).toHaveLength(1);
+    expect(mem.concepts.get("distillation")).toMatchObject({ status: "PENDING", draftId: null });
+  });
+
+  it("planConcepts: rejected ignored, pending-without-draft regenerated, budget enforced (R4.4, R4.5)", () => {
+    const existing: ConceptRow[] = [
+      { ...published },
+      { id: "c2", slug: "rag", term: "RAG", aliases: [], status: "REJECTED", draftId: null },
+      { id: "c3", slug: "lora", term: "LoRA", aliases: [], status: "PENDING", draftId: null },
+      { id: "c4", slug: "moe", term: "MoE", aliases: [], status: "PENDING", draftId: "d9" },
+    ];
+    const plan = planConcepts(
+      [
+        { term: "Quantization", aliases: [] },
+        { term: "RAG", aliases: [] },
+        { term: "LoRA", aliases: [] },
+        { term: "MoE", aliases: [] },
+        { term: "Speculative decoding", aliases: [] },
+        { term: "KV cache", aliases: [] },
+      ],
+      existing,
+      2,
+    );
+    expect(plan.slugs).toEqual(["quantization", "lora", "moe", "speculativedecoding"]);
+    expect(plan.link.map((c) => c.slug)).toEqual(["quantization", "moe"]);
+    expect(plan.draft.map((c) => c.slug)).toEqual(["lora", "speculativedecoding"]);
+  });
+});
+
+describe("collection, freshness and scoring (v1 behaviour kept)", () => {
+  it("ignores URLs already stored", async () => {
     const initial = [row({ id: "o1", sourceId: "openai", status: "DRAFTED" })];
-    const { deps, mem, score } = makeDeps({ feeds: [{ sourceId: "openai", items: [entry("o1", hoursAgo(1))] }], initial });
+    const { deps, score } = makeDeps({ feeds: [{ sourceId: "openai", items: [entry("o1", hoursAgo(1))] }], initial });
     await runCuration(deps);
     expect(score).not.toHaveBeenCalled();
-    expect(mem.drafts).toHaveLength(0);
-    expect(statusOf(mem, "o1")?.status).toBe("DRAFTED");
   });
 
-  it("dedupes the same URL appearing twice in one run", async () => {
+  it("skips undated / stale items and does not store items older than 30 days", async () => {
     const feeds: FeedResult[] = [
-      { sourceId: "openai", items: [entry("x", hoursAgo(1))] },
-      { sourceId: "krebs", items: [entry("x", hoursAgo(1))] },
+      { sourceId: "openai", items: [entry("nodate", null), entry("old", hoursAgo(50)), entry("ancient", hoursAgo(40 * 24))] },
     ];
-    const { deps, mem } = makeDeps({ feeds });
-    await runCuration(deps);
-    expect(mem.items.size).toBe(1);
-  });
-});
-
-describe("freshness (R3.1, R3.2)", () => {
-  it("skips items with no date or older than 48h without scoring them", async () => {
-    const feeds: FeedResult[] = [{ sourceId: "openai", items: [entry("nodate", null), entry("old", hoursAgo(50))] }];
     const { deps, mem, score } = makeDeps({ feeds });
     await runCuration(deps);
     expect(score).not.toHaveBeenCalled();
-    expect(statusOf(mem, "nodate")).toMatchObject({ status: "SKIPPED", skipReason: "no_date" });
-    expect(statusOf(mem, "old")).toMatchObject({ status: "SKIPPED", skipReason: "stale" });
-  });
-
-  it("stales CANDIDATE and FAILED items published more than 48h ago", async () => {
-    const initial = [
-      row({ id: "c", sourceId: "openai", publishedAt: hoursAgo(49) }),
-      row({ id: "f", sourceId: "krebs", status: "FAILED", attempts: 1, publishedAt: hoursAgo(49) }),
-    ];
-    const { deps, mem } = makeDeps({ initial });
-    const summary = await runCuration(deps);
-    expect(summary.staled).toBe(2);
-    expect(mem.drafts).toHaveLength(0);
-    expect(statusOf(mem, "c")?.status).toBe("SKIPPED");
-    expect(statusOf(mem, "f")?.status).toBe("SKIPPED");
-  });
-});
-
-describe("scoring (R4.1, R4.2, R4.5)", () => {
-  it("scores only new items in one call and stores CANDIDATE / SKIPPED(low_score)", async () => {
-    const initial = [row({ id: "prev", sourceId: "deepmind", score: 6 })];
-    const feeds: FeedResult[] = [{ sourceId: "openai", items: [entry("hi", hoursAgo(1)), entry("lo", hoursAgo(1))] }];
-    const { deps, mem, score } = makeDeps({
-      feeds,
-      initial,
-      scores: (keys) => Object.fromEntries(keys.map((k) => [k, k.endsWith("/hi") ? 8 : 3])),
-    });
-    await runCuration(deps);
-    expect(score).toHaveBeenCalledTimes(1);
-    expect(score.mock.calls[0][0].map((i) => i.key)).toEqual(["https://news.example/hi", "https://news.example/lo"]);
-    expect(statusOf(mem, "lo")).toMatchObject({ status: "SKIPPED", skipReason: "low_score", score: 3 });
-    expect(statusOf(mem, "hi")?.status).toBe("DRAFTED");
+    expect(itemOf(mem, "nodate")).toMatchObject({ status: "SKIPPED", skipReason: "no_date" });
+    expect(itemOf(mem, "old")).toMatchObject({ status: "SKIPPED", skipReason: "stale" });
+    expect(itemOf(mem, "ancient")).toBeUndefined();
   });
 
   it("treats total scoring failure as a system problem: records nothing and throws", async () => {
-    const initial = [row({ id: "prev", sourceId: "deepmind" })];
-    const { deps, mem } = makeDeps({
-      feeds: [{ sourceId: "openai", items: [entry("new", hoursAgo(1))] }],
-      initial,
-      scores: () => null,
-    });
+    const { deps, mem } = makeDeps({ feeds: [{ sourceId: "openai", items: [entry("n", hoursAgo(1))] }], scores: () => null });
     await expect(runCuration(deps)).rejects.toBeInstanceOf(ScoringUnavailableError);
-    expect(statusOf(mem, "new")).toBeUndefined(); // 다음 실행에서 다시 채점
-    expect(mem.drafts).toHaveLength(0);
+    expect(itemOf(mem, "n")).toBeUndefined();
   });
 
-  it("leaves items the model omitted unrecorded so they are re-scored next run", async () => {
-    const { deps, mem } = makeDeps({
-      feeds: [{ sourceId: "openai", items: [entry("a", hoursAgo(1)), entry("b", hoursAgo(1))] }],
-      scores: (keys) => ({ [keys[0]]: 2 }),
+  it("passes new events from earlier chunks to later chunks (D14-2)", async () => {
+    const items = Array.from({ length: 12 }, (_, i) => entry(`n${i}`, hoursAgo(1)));
+    const { deps, score } = makeDeps({
+      feeds: [{ sourceId: "openai", items }],
+      scores: (keys) => (keys.length > 10 ? null : Object.fromEntries(keys.map((k) => [k, [7, "shared-event"]]))),
     });
     await runCuration(deps);
-    expect(statusOf(mem, "a")?.status).toBe("SKIPPED");
-    expect(statusOf(mem, "b")).toBeUndefined();
+    expect(score).toHaveBeenCalledTimes(3);
+    expect(score.mock.calls[2][1].knownEvents?.map((e) => e.eventKey)).toContain("shared-event");
+  });
+
+  it("throws AllFeedsFailedError when every feed fails", async () => {
+    const feeds: FeedResult[] = [{ sourceId: "openai", error: new FeedFetchError("timeout", "timeout", "openai") }];
+    const { deps } = makeDeps({ feeds });
+    await expect(runCuration(deps)).rejects.toBeInstanceOf(AllFeedsFailedError);
   });
 
   it("caps scoring at 60 items, filled round-robin across sources", () => {
@@ -187,219 +374,52 @@ describe("scoring (R4.1, R4.2, R4.5)", () => {
     const picked = roundRobinBySource(items, 60);
     expect(picked).toHaveLength(60);
     expect(picked.filter((p) => p.sourceId === "krebs")).toHaveLength(5);
-    expect(picked[0].n).toBe(0); // 소스 내 최신순
+  });
+
+  it("groupByEvent: ranks events by top score and gives v1 candidates a title-based key (R9.1)", () => {
+    const groups = groupByEvent([
+      row({ id: "a", sourceId: "openai", score: 7, eventKey: "e1" }),
+      row({ id: "b", sourceId: "krebs", score: 9, eventKey: "e1" }),
+      row({ id: "c", sourceId: "willison", score: 8, eventKey: null, title: "Old v1 Item" }),
+      row({ id: "d", sourceId: "schneier", score: 5, eventKey: "e3" }),
+    ]);
+    expect(groups.map((g) => g.eventKey)).toEqual(["e1", "old-v1-item"]);
+    expect(groups[0].items.map((i) => i.id)).toEqual(["b", "a"]);
   });
 });
 
-describe("selection (R4.3, R4.4)", () => {
-  it("picks by score, one per source, ties broken by recency", () => {
-    const pool = [
-      row({ id: "o9", sourceId: "openai", score: 9 }),
-      row({ id: "o8", sourceId: "openai", score: 8 }),
-      row({ id: "k7", sourceId: "krebs", score: 7, publishedAt: hoursAgo(10) }),
-      row({ id: "w7", sourceId: "willison", score: 7, publishedAt: hoursAgo(2) }),
-      row({ id: "s6", sourceId: "schneier", score: 6 }),
-      row({ id: "d8", sourceId: "deepmind", score: 8, status: "FAILED", attempts: 1 }),
-    ];
-    expect(selectForDrafting(pool, 3).map((r) => r.id)).toEqual(["o9", "d8", "w7"]);
-  });
-
-  it("does not fill up with sub-threshold items", () => {
-    const pool = [row({ id: "a", sourceId: "openai", score: 6 }), row({ id: "b", sourceId: "krebs", score: 5 })];
-    expect(selectForDrafting(pool, 3).map((r) => r.id)).toEqual(["a"]);
-  });
-});
-
-describe("content resolution (R5)", () => {
-  it("falls back to the RSS summary when extraction fails", async () => {
-    // parseFeed가 이미 정제한 summary가 들어온다 — resolveContent는 다시 htmlToText를 돌리지 않는다
-    const summary = "RSS body & details about Vec<T>. ".repeat(10);
-    const generate = vi.fn(async () => ({
-      ok: true as const,
-      output: { headline: "H", bullets: ["One.", "Two."], tags: [] },
-    }));
+describe("Gemini diff review regressions", () => {
+  it("keeps sources DRAFTED when the concept step throws after the event draft was saved (#1)", async () => {
     const { deps, mem } = makeDeps({
-      feeds: [{ sourceId: "krebs", items: [entry("k", hoursAgo(1), summary)] }],
-      extract: async () => ({ ok: false }),
-      generate,
+      feeds: [{ sourceId: "openai", items: [entry("o", hoursAgo(1))] }],
+      concepts: [{ term: "Boom", aliases: [] }],
     });
-    await runCuration(deps);
-    const raw = (generate.mock.calls[0] as unknown as [{ rawExtract: string }])[0].rawExtract;
-    expect(raw).toContain("RSS body & details about Vec<T>.");
-    expect(mem.drafts[0].content).toContain("#security"); // 태그 없으면 카테고리 태그
-  });
-
-  it("skips with no_content and never calls the model when both sources are too short", async () => {
-    const { deps, mem, generate } = makeDeps({
-      feeds: [{ sourceId: "krebs", items: [entry("k", hoursAgo(1), "x".repeat(120))] }],
-      extract: async () => ({ ok: false }),
-    });
-    await runCuration(deps);
-    expect(generate).not.toHaveBeenCalled();
-    expect(statusOf(mem, "k")).toMatchObject({ status: "SKIPPED", skipReason: "no_content" });
-  });
-});
-
-describe("failures and retries (R7.1–R7.3)", () => {
-  it("continues when one feed fails", async () => {
-    const feeds: FeedResult[] = [
-      { sourceId: "openai", error: new FeedFetchError("http", "HTTP 403", "openai") },
-      { sourceId: "krebs", items: [entry("k", hoursAgo(1))] },
-    ];
-    const { deps, mem } = makeDeps({ feeds });
-    const summary = await runCuration(deps);
-    expect(summary.feedsFailed).toBe(1);
-    expect(mem.drafts).toHaveLength(1);
-  });
-
-  it("throws AllFeedsFailedError when every feed fails", async () => {
-    const feeds: FeedResult[] = [{ sourceId: "openai", error: new FeedFetchError("timeout", "timeout", "openai") }];
-    const { deps } = makeDeps({ feeds });
-    await expect(runCuration(deps)).rejects.toBeInstanceOf(AllFeedsFailedError);
-  });
-
-  it("marks FAILED on first generation failure, then SKIPPED(gave_up) on the retry", async () => {
-    const generate = vi.fn(async () => ({ ok: false as const, reason: "ai_failed" as const }));
-    const { deps, mem } = makeDeps({ feeds: [{ sourceId: "openai", items: [entry("o", hoursAgo(1))] }], generate });
-
-    await runCuration(deps);
-    expect(statusOf(mem, "o")).toMatchObject({ status: "FAILED", attempts: 1 });
-
-    await runCuration(deps);
-    expect(generate).toHaveBeenCalledTimes(2);
-    expect(statusOf(mem, "o")).toMatchObject({ status: "SKIPPED", skipReason: "gave_up", attempts: 2 });
-  });
-
-  it("treats a too-short assembled bit as a failure", async () => {
-    const generate = vi.fn(async () => ({
-      ok: true as const,
-      output: { headline: "H", bullets: ["only one"], tags: [] },
-    }));
-    const { deps, mem } = makeDeps({ feeds: [{ sourceId: "openai", items: [entry("o", hoursAgo(1))] }], generate });
-    await runCuration(deps);
-    expect(statusOf(mem, "o")?.status).toBe("FAILED");
-  });
-
-  it("counts retries toward the per-run cap of 3", async () => {
-    const initial = ["a", "b", "c"].map((id, i) =>
-      row({ id, sourceId: SOURCES[i].id, status: "FAILED", attempts: 1, score: 9 }),
-    );
-    const { deps, generate } = makeDeps({
-      initial,
-      feeds: [{ sourceId: "schneier", items: [entry("s", hoursAgo(1))] }],
-    });
-    await runCuration(deps);
-    expect(generate).toHaveBeenCalledTimes(3);
-  });
-});
-
-describe("draft warnings (R6.5)", () => {
-  it("adds number_not_in_source warnings from the headline and bullets only", async () => {
-    const generate = vi.fn(async () => ({
-      ok: true as const,
-      output: { headline: "40% faster", bullets: ["1,200 users hit.", "Second fact."], tags: ["ai"] },
-    }));
-    const { deps, mem } = makeDeps({ feeds: [{ sourceId: "openai", items: [entry("o", hoursAgo(1))] }], generate });
-    await runCuration(deps);
-    expect(mem.drafts[0].warnings).toEqual(["number_not_in_source:40"]);
-  });
-});
-
-describe("purge (R8.2)", () => {
-  it("purges items published over 30 days ago but keeps undated ones", async () => {
-    const initial = [
-      row({ id: "old", sourceId: "openai", status: "SKIPPED", publishedAt: hoursAgo(31 * 24) }),
-      row({ id: "nodate", sourceId: "openai", status: "SKIPPED", publishedAt: null }),
-    ];
-    const { deps, mem } = makeDeps({ initial, feeds: [{ sourceId: "openai", items: [entry("nodate", null)] }] });
-    const summary = await runCuration(deps);
-    expect(summary.purgedItems).toBe(1);
-    expect(statusOf(mem, "old")).toBeUndefined();
-    expect(mem.items.size).toBe(1); // undated item not re-inserted
-  });
-});
-
-describe("Gemini diff review fixes", () => {
-  it("retries scoring in chunks after a whole-batch failure and skips chunks that still fail", async () => {
-    const items = Array.from({ length: 12 }, (_, i) => entry(`n${i}`, hoursAgo(1)));
-    const mem = createMemoryStore();
-    let call = 0;
-    const score = vi.fn(async (batch: { key: string }[]) => {
-      call++;
-      if (call === 1) return { ok: false as const }; // 전체 배치 실패
-      if (batch.some((b) => b.key.endsWith("/n0"))) return { ok: false as const }; // 첫 묶음(10개) 계속 실패
-      return { ok: true as const, scores: Object.fromEntries(batch.map((b) => [b.key, 3])) };
-    });
-    const deps: CurationDeps = {
-      store: mem.store,
-      sources: SOURCES,
-      now: () => NOW,
-      fetchAll: async () => [{ sourceId: "openai", items }],
-      extract: async () => ({ ok: true, rawExtract: BODY }),
-      score,
-      generate: async () => ({ ok: false, reason: "ai_failed" }),
+    deps.store.ensureConceptLinked = async () => {
+      throw new Error("db hiccup");
     };
     await runCuration(deps);
-    expect(score).toHaveBeenCalledTimes(3); // 1 batch + 2 chunks
-    const statuses = [...mem.items.values()].map((i) => (i as { skipReason?: string }).skipReason);
-    expect(statuses.filter((r) => r === "score_failed")).toHaveLength(10);
-    expect(statuses.filter((r) => r === "low_score")).toHaveLength(2);
+    expect(newsDrafts(mem)).toHaveLength(1);
+    expect(itemOf(mem, "o")?.status).toBe("DRAFTED");
   });
 
-  it("replaces a no_content pick with the next candidate without spending a model call", async () => {
-    const initial = [
-      row({ id: "top", sourceId: "openai", score: 9 }),
-      row({ id: "next", sourceId: "openai", score: 8 }),
-      row({ id: "k", sourceId: "krebs", score: 7 }),
-      row({ id: "w", sourceId: "willison", score: 7 }),
-      row({ id: "s", sourceId: "schneier", score: 6 }),
-    ];
-    const { deps, mem, generate } = makeDeps({
-      initial,
-      extract: async (url) => (url.endsWith("/top") ? { ok: false } : { ok: true, rawExtract: BODY }),
+  it("skips an event whose key exists outside the 7-day window without calling the model (#3)", async () => {
+    const { deps, mem, generateEvent } = makeDeps({
+      feeds: [{ sourceId: "openai", items: [entry("o", hoursAgo(1))] }],
+      scores: (k) => ({ [k[0]]: [9, "ancient-event"] }),
     });
+    deps.store.findRecentEvents = async () => [];
+    deps.store.findEventStatus = async (key) => (key === "ancient-event" ? "PUBLISHED" : null);
     await runCuration(deps);
-    expect(statusOf(mem, "top")).toMatchObject({ status: "SKIPPED", skipReason: "no_content" });
-    expect(generate).toHaveBeenCalledTimes(3);
-    expect(statusOf(mem, "next")?.status).toBe("DRAFTED"); // 같은 소스 차순위가 대신 들어옴
-    expect(statusOf(mem, "s")?.status).toBe("CANDIDATE");
+    expect(generateEvent).not.toHaveBeenCalled();
+    expect(itemOf(mem, "o")).toMatchObject({ status: "SKIPPED", skipReason: "event_closed" });
   });
 
-  it("links the clean URL (keeps www and trailing slash, drops tracking params)", async () => {
-    const feeds: FeedResult[] = [
-      {
-        sourceId: "krebs",
-        items: [{ url: "https://www.krebs.example/2026/11/post/?utm_source=rss#c", title: "T", summary: "", publishedAt: hoursAgo(1) }],
-      },
-    ];
-    const { deps, mem } = makeDeps({ feeds });
-    await runCuration(deps);
-    expect(mem.drafts[0].content).toContain("\nhttps://www.krebs.example/2026/11/post/\n");
-  });
-
-  it("checks numbers only in bullets that survived the 500-char trim", async () => {
-    const long = "x".repeat(150);
-    const generate = vi.fn(async () => ({
-      ok: true as const,
-      output: { headline: "H", bullets: [`${long} a.`, `${long} b.`, `${long} 999 c.`], tags: ["ai"] },
-    }));
-    const { deps, mem } = makeDeps({ feeds: [{ sourceId: "openai", items: [entry("o", hoursAgo(1))] }], generate });
-    await runCuration(deps);
-    expect(mem.drafts[0].content).not.toContain("999");
-    expect(mem.drafts[0].warnings).not.toContain("number_not_in_source:999");
-  });
-});
-
-describe("retention churn", () => {
-  it("does not store items older than the 30-day retention window, so purge and re-insert don't loop", async () => {
-    const feeds: FeedResult[] = [{ sourceId: "openai", items: [entry("ancient", hoursAgo(40 * 24)), entry("week", hoursAgo(7 * 24))] }];
-    const { deps, mem } = makeDeps({ feeds });
-    const first = await runCuration(deps);
-    expect(statusOf(mem, "ancient")).toBeUndefined();
-    expect(statusOf(mem, "week")).toMatchObject({ status: "SKIPPED", skipReason: "stale" });
-    const second = await runCuration(deps);
-    expect(first.skippedNew).toBe(1);
-    expect(second.skippedNew).toBe(0);
-    expect(second.purgedItems).toBe(0);
+  it("does not match concepts through empty normalized aliases (#8)", () => {
+    const plan = planConcepts(
+      [{ term: "Brand new idea", aliases: ["—"] }],
+      [{ id: "x", slug: "other", term: "Other", aliases: ["…"], status: "REJECTED", draftId: null }],
+      1,
+    );
+    expect(plan.draft.map((c) => c.slug)).toEqual(["brandnewidea"]);
   });
 });

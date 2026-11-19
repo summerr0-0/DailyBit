@@ -21,8 +21,9 @@ describe("newsExpiryLabel", () => {
 });
 
 describe("isNewsDraftExpired", () => {
-  it("is true from 72h on", () => {
+  it("is true only after 72h (same boundary as the cron)", () => {
     expect(isNewsDraftExpired(hoursAgo(71), now)).toBe(false);
-    expect(isNewsDraftExpired(hoursAgo(72), now)).toBe(true);
+    expect(isNewsDraftExpired(hoursAgo(72), now)).toBe(false);
+    expect(isNewsDraftExpired(hoursAgo(72.01), now)).toBe(true);
   });
 });

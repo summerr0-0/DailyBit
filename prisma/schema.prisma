@@ -23,6 +23,22 @@ enum SourceType {
 enum DraftKind {
   MANUAL
   NEWS
+  CONCEPT
+}
+
+// 뉴스 사건 상태. spec: news-curation-v2 D9, D12
+enum NewsEventStatus {
+  OPEN
+  PUBLISHED
+  DISCARDED
+  EXPIRED
+}
+
+// 초보자 개념 상태. spec: news-curation-v2 D5, D12
+enum ConceptStatus {
+  PENDING
+  PUBLISHED
+  REJECTED
 }
 
 // 자동 수집 기사 상태. spec: news-curation D15 상태 전이표
@@ -142,6 +158,9 @@ model ScrapDraft {
   warnings             String[]   @default([])
   feedItemId           String?    @unique
   feedItem             FeedItem?  @relation(fields: [feedItemId], references: [id], onDelete: SetNull)
+  eventKey             String?
+  conceptSlugs         String[]   @default([])
+  conceptId            String?
   authorId             String
   author               User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
   createdAt            DateTime   @default(now())
@@ -149,6 +168,7 @@ model ScrapDraft {
 
   @@index([authorId])
   @@index([kind, createdAt])
+  @@index([eventKey])
   @@map("scrap_drafts")
 }
 
@@ -167,10 +187,56 @@ model FeedItem {
   status        FeedItemStatus
   skipReason    String?
   attempts      Int            @default(0)
+  eventKey      String?
   updatedAt     DateTime       @updatedAt
 
   draft ScrapDraft?
 
   @@index([status, publishedAt])
   @@map("feed_items")
+}
+
+// 뉴스 사건 — 열림/발행/폐기/만료의 단일 출처. spec: news-curation-v2 D9
+model NewsEvent {
+  id        String          @id @default(cuid())
+  eventKey  String          @unique
+  title     String
+  status    NewsEventStatus @default(OPEN)
+  draftId   String?         @unique
+  threadId  String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([status, updatedAt])
+  @@map("news_events")
+}
+
+// 초보자 개념 — 개념 Thread와 연결. spec: news-curation-v2 D5, D14-3
+model Concept {
+  id        String        @id @default(cuid())
+  slug      String        @unique
+  term      String
+  aliases   String[]      @default([])
+  status    ConceptStatus @default(PENDING)
+  threadId  String?
+  draftId   String?       @unique
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  events ConceptEvent[]
+
+  @@map("concepts")
+}
+
+// 개념 ↔ 사건 다대다 (D14-3)
+model ConceptEvent {
+  id        String   @id @default(cuid())
+  conceptId String
+  concept   Concept  @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  eventKey  String
+  createdAt DateTime @default(now())
+
+  @@unique([conceptId, eventKey])
+  @@index([eventKey])
+  @@map("concept_events")
 }

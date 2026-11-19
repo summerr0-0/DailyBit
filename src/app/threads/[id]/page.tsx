@@ -2,36 +2,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getThread } from "@/lib/threads";
 import { getTagCloud } from "@/lib/bits";
-import { TAG_PATTERN } from "@/lib/tags";
-import type { ReactNode } from "react";
+import { renderBitContent } from "@/components/bits/bit-content";
 
 type Props = { params: Promise<{ id: string }> };
-
-function renderContent(content: string): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  let lastIndex = 0;
-
-  for (const match of content.matchAll(TAG_PATTERN)) {
-    const start = match.index ?? 0;
-    const full = match[0];
-    const name = match[1];
-
-    if (start > lastIndex) nodes.push(content.slice(lastIndex, start));
-    nodes.push(
-      <Link
-        key={start}
-        href={`/tags/${name.toLowerCase()}`}
-        style={{ color: "#B05A18", fontWeight: 600 }}
-      >
-        {full}
-      </Link>,
-    );
-    lastIndex = start + full.length;
-  }
-
-  if (lastIndex < content.length) nodes.push(content.slice(lastIndex));
-  return nodes;
-}
 
 export default async function ThreadPage({ params }: Props) {
   const { id } = await params;
@@ -151,7 +124,7 @@ export default async function ThreadPage({ params }: Props) {
                       })}
                     </p>
                     <p style={{ fontSize: "15px", lineHeight: 1.68, color: "#33302A", whiteSpace: "pre-wrap", margin: 0 }}>
-                      {renderContent(bit.content)}
+                      {renderBitContent(bit.content)}
                     </p>
                     {bit.tags.length > 0 && (
                       <div style={{ marginTop: "10px", display: "flex", flexWrap: "wrap", gap: "6px" }}>

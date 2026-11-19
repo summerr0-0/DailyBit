@@ -72,3 +72,78 @@ test("owner reviews a news draft in the inbox and publishes it with a clickable 
   await expect(link).toHaveAttribute("href", URL);
   await expect(link).toHaveAttribute("rel", "noopener noreferrer nofollow");
 });
+
+// v2 (spec: news-curation-v2 R6.1, R8.1): 사건 Thread 초안 → 발행 → 이미 발행된 개념 링크 Bit가 붙는다.
+test.describe("v2 event thread", () => {
+  const V2 = `v2-${STAMP}`;
+  const EVENT_KEY = `e2e-event-${STAMP}`;
+  const CONCEPT_THREAD = `e2e_cthread_${STAMP}`;
+  const CONCEPT_ID = `e2e_concept_${STAMP}`;
+  const DRAFT2 = `e2e_draft2_${STAMP}`;
+  const SLUG = `e2econcept${STAMP}`;
+  const V2_HEADLINE = `E2E event headline ${STAMP}`;
+
+  test.beforeAll(async () => {
+    const { rows } = await pool.query(`SELECT id FROM users WHERE email = 'dev@dailybit.dev'`);
+    const authorId = rows[0].id as string;
+    await pool.query(
+      `INSERT INTO threads (id, title, "authorId", "createdAt", "updatedAt") VALUES ($1, 'What is E2E concept?', $2, now(), now())`,
+      [CONCEPT_THREAD, authorId],
+    );
+    await pool.query(
+      `INSERT INTO concepts (id, slug, term, aliases, status, "threadId", "createdAt", "updatedAt")
+       VALUES ($1, $2, 'E2E Concept', ARRAY[]::text[], 'PUBLISHED'::"ConceptStatus", $3, now(), now())`,
+      [CONCEPT_ID, SLUG, CONCEPT_THREAD],
+    );
+    await pool.query(
+      `INSERT INTO scrap_drafts (id, kind, "sourceType", "sourceUrl", "sourceTitle", "sourceLabel", "rawExtract",
+         segments, "suggestedThreadTitle", warnings, "eventKey", "conceptSlugs", "authorId", "updatedAt")
+       VALUES ($1, 'NEWS'::"DraftKind", 'URL'::"SourceType", $2, 'E2E event', 'OpenAI News + Simon Willison', 'body',
+         $3::jsonb, $4, ARRAY[]::text[], $5, ARRAY[$6], $7, now())`,
+      [
+        DRAFT2,
+        `https://news.example/${V2}`,
+        JSON.stringify([
+          `${V2_HEADLINE}\n- Fact one.\n- Fact two.\n\n#ai`,
+          `Source: OpenAI News — Point one.\nhttps://news.example/${V2}-a`,
+          `Source: Simon Willison — Point two.\nhttps://news.example/${V2}-b`,
+        ]),
+        V2_HEADLINE,
+        EVENT_KEY,
+        SLUG,
+        authorId,
+      ],
+    );
+    await pool.query(
+      `INSERT INTO news_events (id, "eventKey", title, status, "draftId", "updatedAt") VALUES ($1, $2, 'E2E event', 'OPEN'::"NewsEventStatus", $3, now())`,
+      [`e2e_ev_${STAMP}`, EVENT_KEY, DRAFT2],
+    );
+  });
+
+  test.afterAll(async () => {
+    await pool.query(`DELETE FROM scrap_drafts WHERE id = $1`, [DRAFT2]);
+    await pool.query(`DELETE FROM news_events WHERE "eventKey" = $1`, [EVENT_KEY]);
+    await pool.query(`DELETE FROM concepts WHERE id = $1`, [CONCEPT_ID]);
+  });
+
+  test("publishing an event thread appends a link to the already-published concept", async ({ page }) => {
+    const login = await page.request.post("/api/auth/login", { data: { passphrase: process.env.ADMIN_PASSPHRASE } });
+    expect(login.ok()).toBe(true);
+    await page.goto("/scrap");
+
+    const card = page.getByTestId("draft-card").filter({ has: page.locator(`textarea:has-text("${V2_HEADLINE}")`) });
+    await expect(card).toHaveCount(1);
+    await expect(card.getByTestId("news-meta")).toContainText("2 sources");
+    await expect(card.getByTestId("news-meta")).toContainText("E2E Concept (published");
+    await card.getByRole("button", { name: "Publish" }).click();
+    await expect(page.locator("textarea", { hasText: V2_HEADLINE })).toHaveCount(0);
+
+    const { rows } = await pool.query(`SELECT status, "threadId" FROM news_events WHERE "eventKey" = $1`, [EVENT_KEY]);
+    expect(rows[0].status).toBe("PUBLISHED");
+    await page.goto(`/threads/${rows[0].threadId}`);
+    await expect(page.getByText(V2_HEADLINE).first()).toBeVisible();
+    const conceptLink = page.getByRole("link", { name: new RegExp(`/threads/${CONCEPT_THREAD}$`) });
+    await expect(conceptLink).toHaveCount(1);
+    await expect(page.getByText("New to this? E2E Concept")).toBeVisible();
+  });
+});
