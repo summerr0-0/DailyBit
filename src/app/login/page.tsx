@@ -102,6 +102,9 @@ function SuccessView() {
           </svg>
         </div>
         <p className={styles.successText}>Welcome back, Irin</p>
+        <Link href="/scrap" className={styles.successLink}>
+          Open Scrap &amp; News inbox &rarr;
+        </Link>
         <Link href="/" className={styles.successLink}>
           Go to the blog &rarr;
         </Link>
