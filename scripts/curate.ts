@@ -29,26 +29,43 @@ async function dryRunDeps(): Promise<{ deps: CurationDeps; report: () => void }>
     { sourceId: sources[0].id, items: rss },
     { sourceId: sources[1].id, items: atom },
   ];
-  const { store, drafts, items } = createMemoryStore();
+  const mem = createMemoryStore();
+  const body = "Fixture article body. ".repeat(20) + "Released 2 models.";
   const deps: CurationDeps = {
-    store,
+    store: mem.store,
     sources,
     now: () => now,
     log: (l) => console.log(l),
     fetchAll: async () => results,
-    extract: async () => ({ ok: true, rawExtract: "Fixture article body. ".repeat(20) + "Released 2 models." }),
-    score: async (input) => ({ ok: true, scores: Object.fromEntries(input.map((i) => [i.key, 7])) }),
-    generate: async ({ title }) => ({
+    extract: async () => ({ ok: true, rawExtract: body }),
+    // 모든 신선 기사를 한 사건으로 묶어 "출처 2개 → Thread 1건"을 재현한다 (v2 D13a)
+    score: async (input) => ({
       ok: true,
-      output: { headline: title, bullets: ["Fixture fact one.", "Fixture fact two.", "Released 2 models."], tags: ["ai"] },
+      results: Object.fromEntries(input.map((i) => [i.key, { score: 7, event: "fixture-model-release" }])),
+      scores: Object.fromEntries(input.map((i) => [i.key, 7])),
     }),
+    generateEvent: async ({ eventTitle, sources: srcs }) => ({
+      ok: true,
+      output: {
+        headline: eventTitle,
+        bullets: ["Fixture fact one.", "Fixture fact two.", "Released 2 models."],
+        sources: srcs.map((_, index) => ({ index, point: `Fixture point ${index + 1}.` })),
+        tags: ["ai"],
+        concepts: [{ term: "Quantization", aliases: ["4-bit quantization"] }],
+      },
+    }),
+    generateConcept: async ({ term }) => ({
+      ok: true,
+      output: { definition: `${term} is a fixture definition.`, whyItMatters: "It matters for fixtures.", aliases: [] },
+    }),
+    generateSourcePoint: async () => ({ ok: true, point: "Late fixture point." }),
   };
   return {
     deps,
     report: () => {
-      console.log(`dry-run: ${items.size} feed items, ${drafts.length} drafts`);
-      for (const d of drafts) console.log(`--- draft (${d.sourceLabel}) warnings=${JSON.stringify(d.warnings)}\n${d.content}`);
-      if (drafts.length === 0) throw new Error("dry-run produced no drafts");
+      console.log(`dry-run: ${mem.items.size} feed items, ${mem.drafts.length} drafts`);
+      for (const d of mem.drafts) console.log(`--- ${d.kind} (${d.sourceLabel}) warnings=${JSON.stringify(d.warnings)}\n${d.segments.join("\n· · ·\n")}`);
+      if (!mem.drafts.some((d) => d.kind === "NEWS")) throw new Error("dry-run produced no news draft");
     },
   };
 }
@@ -68,8 +85,10 @@ async function prodDeps(): Promise<CurationDeps> {
       const r = await extractSource({ sourceType: "URL", url });
       return r.ok ? { ok: true, rawExtract: r.rawExtract } : { ok: false };
     },
-    score: (items) => ai.scoreItems(items),
-    generate: (input) => ai.generateNews(input),
+    score: (items, opts) => ai.scoreItems(items, opts),
+    generateEvent: (input) => ai.generateEventNews(input),
+    generateConcept: (input) => ai.generateConcept(input),
+    generateSourcePoint: (input) => ai.generateSourcePoint(input),
   };
 }
 

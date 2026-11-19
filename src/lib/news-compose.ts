@@ -129,3 +129,128 @@ export function checkNumbers(output: string, rawExtract: string): string[] {
   }
   return warnings;
 }
+
+// ── v2: 사건별 Thread 조립 (spec: news-curation-v2 D3, D4, D6, D7, D14-6/8, R3.1~R3.4) ──
+
+export const THREAD_TITLE_MAX_CHARS = 100;
+const ELLIPSIS = "…";
+
+/** max자 이하로 단어 경계에서 자르고 "…"를 붙인다. 공백이 없으면 글자 단위로 자른다. */
+export function truncateAtWord(text: string, max: number): string {
+  if (text.length <= max) return text;
+  if (max <= ELLIPSIS.length) return text.slice(0, Math.max(0, max));
+  const room = max - ELLIPSIS.length;
+  const head = text.slice(0, room + 1); // 다음 글자가 공백이면 바로 앞이 단어 경계
+  const cut = head.lastIndexOf(" ");
+  const body = (cut > 0 ? head.slice(0, cut) : text.slice(0, room)).trimEnd();
+  return body + ELLIPSIS;
+}
+
+export type NewsThreadOutput = {
+  headline: string;
+  bullets: string[];
+  sources: { index: number; point: string }[];
+  tags: string[];
+};
+export type NewsThreadSource = { name: string; url: string; category: string };
+
+export type BuildNewsThreadResult =
+  | { ok: true; segments: string[]; threadTitle: string; warnings: string[] }
+  | { ok: false; reason: "empty_headline" | "too_few_bullets" | "no_sources" };
+
+function assembleSummary(headline: string, bullets: string[], tags: string[]): string {
+  const lines = [headline, ...bullets.map((b) => `- ${b}`)];
+  if (tags.length > 0) lines.push("", tags.map((t) => `#${t}`).join(" "));
+  return lines.join("\n");
+}
+
+/** 출처 Bit: `Source: {name} — {point}\n{url}`. point가 비면 `Source: {name}\n{url}`. point는 500자에 맞게 단어 경계로 자른다. */
+export function buildSourceBit(input: { name: string; url: string; point?: string | null }): string {
+  const name = collapseSpaces(input.name);
+  const url = input.url.trim();
+  const point = stripUrls(input.point ?? "").text;
+  const bare = `Source: ${name}\n${url}`;
+  if (!point) return bare;
+  const prefix = `Source: ${name} — `;
+  const room = NEWS_BIT_MAX_CHARS - prefix.length - 1 - url.length;
+  if (room <= ELLIPSIS.length) return bare;
+  return `${prefix}${truncateAtWord(point, room)}\n${url}`;
+}
+
+/** headline을 Thread 제목(≤100자)으로 만든다. */
+function toThreadTitle(text: string): string {
+  return truncateAtWord(collapseSpaces(text), THREAD_TITLE_MAX_CHARS);
+}
+
+/**
+ * 구조화 출력 + 출처 목록 → Thread segments.
+ * segments[0] = 요약 Bit(URL 없음, 태그 포함; 500자 초과면 뒤 불릿부터 제거, 2개 미만이면 실패).
+ * segments[1..] = 출처 입력 순서대로 출처 Bit. output.sources[].index는 sources 배열 인덱스.
+ * 숫자 검사는 호출자가 checkNumbersMulti로 따로 한다.
+ */
+export function buildNewsThread(output: NewsThreadOutput, sources: readonly NewsThreadSource[]): BuildNewsThreadResult {
+  let urlRemoved = false;
+
+  const h = stripUrls(output.headline ?? "");
+  urlRemoved ||= h.removed;
+  const headline = h.text;
+  if (!headline) return { ok: false, reason: "empty_headline" };
+  if (sources.length === 0) return { ok: false, reason: "no_sources" };
+
+  const bullets: string[] = [];
+  for (const raw of output.bullets ?? []) {
+    const b = stripUrls(raw.replace(/^\s*[-*•]\s+/u, ""));
+    urlRemoved ||= b.removed;
+    if (b.text) bullets.push(b.text);
+  }
+
+  const tags = cleanTags(output.tags ?? [], sources[0].category);
+  let summary = assembleSummary(headline, bullets, tags);
+  while (summary.length > NEWS_BIT_MAX_CHARS && bullets.length > 0) {
+    bullets.pop();
+    summary = assembleSummary(headline, bullets, tags);
+  }
+  if (bullets.length < MIN_BULLETS || summary.length > NEWS_BIT_MAX_CHARS) {
+    return { ok: false, reason: "too_few_bullets" };
+  }
+
+  // index → point (첫 번째 값 우선, 범위 밖 index는 무시)
+  const points = new Map<number, string>();
+  for (const s of output.sources ?? []) {
+    if (!Number.isInteger(s.index) || s.index < 0 || s.index >= sources.length || points.has(s.index)) continue;
+    const p = stripUrls(s.point ?? "");
+    urlRemoved ||= p.removed;
+    if (p.text) points.set(s.index, p.text);
+  }
+
+  const segments = [summary, ...sources.map((src, i) => buildSourceBit({ ...src, point: points.get(i) }))];
+
+  const warnings: string[] = [];
+  if (urlRemoved) warnings.push("llm_url_removed");
+  warnings.push(...findBannedPhrases([headline, ...bullets, ...points.values()].join("\n")));
+
+  return { ok: true, segments, threadTitle: toThreadTitle(headline), warnings };
+}
+
+function withBody(prefixLine: string, body: string): string {
+  const room = NEWS_BIT_MAX_CHARS - prefixLine.length - 1;
+  return `${prefixLine}\n${truncateAtWord(body, Math.max(0, room))}`;
+}
+
+/** 개념 Thread 앞 Bit 2개(D6 ①②). ③ 관련 뉴스 Bit는 발행 시점에 draft-hooks의 relatedNewsBit로 붙인다. */
+export function buildConceptThread(input: { term: string; definition: string; whyItMatters: string }): {
+  ok: true;
+  segments: [string, string];
+  threadTitle: string;
+} {
+  const term = stripUrls(input.term).text;
+  const title = `What is ${term}?`;
+  const first = withBody(truncateAtWord(title, NEWS_BIT_MAX_CHARS - 1), stripUrls(input.definition).text);
+  const second = withBody("Why it matters", stripUrls(input.whyItMatters).text);
+  return { ok: true, segments: [first, second], threadTitle: toThreadTitle(title) };
+}
+
+/** checkNumbers와 같은 규칙을 여러 출처 본문 합본 기준으로 적용한다(D4, R3.4). */
+export function checkNumbersMulti(text: string, rawExtracts: readonly string[]): string[] {
+  return checkNumbers(text, rawExtracts.join("\n"));
+}

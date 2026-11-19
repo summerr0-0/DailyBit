@@ -180,8 +180,11 @@ export function DraftCard({
   const [title, setTitle] = useState(draft.suggestedThreadTitle ?? "");
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
 
-  const isThread = segments.length >= 2;
+  // v2 사건·개념 초안은 서버가 항상 Thread로 발행한다 — 제목 입력도 항상 보여준다 (Gemini diff #7)
+  const alwaysThread = draft.kind === "CONCEPT" || (draft.kind === "NEWS" && draft.eventKey !== null);
+  const isThread = alwaysThread || segments.length >= 2;
   const overLimit = segments.some((s) => s.trim().length === 0 || s.length > MAX);
 
   function updateSegment(i: number, value: string) {
@@ -199,8 +202,14 @@ export function DraftCard({
       const res = await fetch(`/api/scrap/drafts/${draft.id}/publish`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ segments, threadTitle: isThread ? title : null }),
+        body: JSON.stringify({ segments, threadTitle: isThread ? title : null, expectedUpdatedAt: draft.updatedAt }),
       });
+      if (res.status === 409) {
+        // 화면을 보는 사이 cron이 출처를 추가했다 (v2 R7.1) — 덮어쓰지 않고 다시 불러오게 한다
+        setStale(true);
+        setWorking(false);
+        return;
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "publish failed");
@@ -284,6 +293,14 @@ export function DraftCard({
         </button>
       </div>
       {error && <p style={{ marginTop: 10, fontSize: 12.5, color: "#C0392B" }}>{error}</p>}
+      {stale && (
+        <p role="alert" style={{ marginTop: 10, fontSize: 12.5, color: "#9C4A1A" }}>
+          A new source was added to this draft. Reload to see it before publishing.{" "}
+          <button type="button" onClick={() => window.location.reload()} style={{ ...ghostBtn, padding: "2px 10px", fontSize: 12 }}>
+            Reload
+          </button>
+        </p>
+      )}
     </div>
   );
 }
