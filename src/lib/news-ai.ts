@@ -45,7 +45,9 @@ async function callJson(
       .map((block) => block.text)
       .join("");
     return JSON.parse(raw);
-  } catch {
+  } catch (e) {
+    // 원인을 Actions 로그에 남긴다 (예전엔 삼켜서 CLI 인증 실패를 알 수 없었다). 시크릿은 메시지에 없다.
+    console.warn(`news-ai call failed (${params.model}): ${e instanceof Error ? e.message.slice(0, 300) : String(e)}`);
     return null;
   }
 }

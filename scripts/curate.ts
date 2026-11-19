@@ -4,7 +4,13 @@
 import "dotenv/config";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { AllFeedsFailedError, createMemoryStore, runCuration, type CurationDeps } from "@/lib/news-curate";
+import {
+  AllFeedsFailedError,
+  ScoringUnavailableError,
+  createMemoryStore,
+  runCuration,
+  type CurationDeps,
+} from "@/lib/news-curate";
 import { NEWS_SOURCES } from "@/lib/news-sources";
 import { fetchAllFeeds, parseFeed, type FeedResult } from "@/lib/news-feed";
 
@@ -79,7 +85,7 @@ async function main(): Promise<number> {
     await runCuration(await prodDeps());
     return 0;
   } catch (e) {
-    console.error(e instanceof AllFeedsFailedError ? "all feeds failed" : e);
+    console.error(e instanceof AllFeedsFailedError || e instanceof ScoringUnavailableError ? e.message : e);
     return 1;
   } finally {
     await prisma.$disconnect(); // R7.4: pg Pool이 남아 job이 hang하지 않게
