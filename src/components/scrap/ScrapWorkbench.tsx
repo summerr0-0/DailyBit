@@ -165,7 +165,16 @@ export function ScrapWorkbench({ initialDrafts }: { initialDrafts: ScrapDraftDTO
   );
 }
 
-function DraftCard({ draft, onDone }: { draft: ScrapDraftDTO; onDone: () => void }) {
+export function DraftCard({
+  draft,
+  onDone,
+  extra,
+}: {
+  draft: ScrapDraftDTO;
+  onDone: () => void;
+  /** 카드 상단 추가 정보 (News inbox: 소스·만료·경고). */
+  extra?: React.ReactNode;
+}) {
   const router = useRouter();
   const [segments, setSegments] = useState<string[]>(draft.segments);
   const [title, setTitle] = useState(draft.suggestedThreadTitle ?? "");
@@ -228,6 +237,8 @@ function DraftCard({ draft, onDone }: { draft: ScrapDraftDTO; onDone: () => void
           </a>
         )}
       </div>
+
+      {extra}
 
       {isThread && (
         <input

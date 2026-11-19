@@ -1,25 +1,26 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { TAG_PATTERN } from "@/lib/tags";
+import { splitByUrls } from "@/lib/linkify";
 import type { BitWithAuthor } from "@/lib/bits";
 import { RebitButton } from "./RebitButton";
 import { LikeButton } from "./LikeButton";
 import { CommentSection } from "./CommentSection";
 import { ThreadReplyButton } from "./ThreadReplyButton";
 
-function renderContent(content: string): ReactNode[] {
+function renderTags(text: string, offset: number): ReactNode[] {
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
 
-  for (const match of content.matchAll(TAG_PATTERN)) {
+  for (const match of text.matchAll(TAG_PATTERN)) {
     const start = match.index ?? 0;
     const full = match[0];
     const name = match[1];
 
-    if (start > lastIndex) nodes.push(content.slice(lastIndex, start));
+    if (start > lastIndex) nodes.push(text.slice(lastIndex, start));
     nodes.push(
       <Link
-        key={start}
+        key={offset + start}
         href={`/tags/${name.toLowerCase()}`}
         style={{ color: "#B05A18", fontWeight: 600 }}
       >
@@ -29,8 +30,27 @@ function renderContent(content: string): ReactNode[] {
     lastIndex = start + full.length;
   }
 
-  if (lastIndex < content.length) nodes.push(content.slice(lastIndex));
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
   return nodes;
+}
+
+// URL 구간을 먼저 떼어낸 뒤 나머지 텍스트에서만 #태그를 링크로 만든다 (spec D13).
+function renderContent(content: string): ReactNode[] {
+  return splitByUrls(content).flatMap((segment) =>
+    segment.type === "url"
+      ? [
+          <a
+            key={segment.start}
+            href={segment.value}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            style={{ color: "#B05A18", textDecoration: "underline", wordBreak: "break-all" }}
+          >
+            {segment.value}
+          </a>,
+        ]
+      : renderTags(segment.value, segment.start),
+  );
 }
 
 type Props = { bit: BitWithAuthor; isLoggedIn?: boolean };

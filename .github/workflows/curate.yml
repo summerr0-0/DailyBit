@@ -1,0 +1,38 @@
+name: News curation
+
+# 해외 AI·보안 RSS를 수집해 /scrap News inbox에 비공개 초안을 만든다 (spec: specs/news-curation/spec.md).
+# 06:00·18:00 KST = 21:00·09:00 UTC. 초안은 오너가 확인한 뒤에만 발행된다.
+on:
+  schedule:
+    - cron: "0 21,9 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: curate
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  curate:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
+      - name: Curate
+        run: pnpm tsx scripts/curate.ts
+        env:
+          # Supabase Session Pooler (IPv4) — GitHub 러너는 IPv6가 없다
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

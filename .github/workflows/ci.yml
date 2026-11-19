@@ -23,6 +23,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test:run
+      - name: News curation dry-run (fixtures, no DB/API)
+        run: pnpm tsx scripts/curate.ts --dry-run
 
   e2e:
     runs-on: ubuntu-latest
@@ -43,6 +45,8 @@ jobs:
     env:
       # CI 전용 격리 DB — 프로덕션 Supabase를 건드리지 않고 매 실행마다 깨끗한 상태로 시드한다.
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dailybit_test
+      # e2e 오너 로그인용 테스트 전용 값 (운영 값 아님)
+      ADMIN_PASSPHRASE: e2e-test-passphrase
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
