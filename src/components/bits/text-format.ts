@@ -3,23 +3,40 @@
 
 export type Edit = { value: string; selectionStart: number; selectionEnd: number };
 
-export function toggleBold(value: string, start: number, end: number): Edit {
+/** 선택한 글자를 marker로 감싸거나(없으면) 벗긴다(있으면). 선택이 없으면 빈 쌍을 넣고 커서를 가운데. */
+export function toggleWrap(value: string, start: number, end: number, marker: string): Edit {
+  const n = marker.length;
+  const other = marker === "**" ? "~~" : "**";
   const selected = value.slice(start, end);
   const before = value.slice(0, start);
   const after = value.slice(end);
 
-  // 선택 바깥에 **가 붙어 있으면 벗긴다: **[sel]**
-  if (before.endsWith("**") && after.startsWith("**")) {
-    const v = before.slice(0, -2) + selected + after.slice(2);
-    return { value: v, selectionStart: start - 2, selectionEnd: end - 2 };
+  // 선택 바깥에 marker가 붙어 있으면 벗긴다: M[sel]M, 다른 서식 한 겹을 사이에 둔 M O[sel]O M 도 (Gemini strike #1)
+  for (const inner of ["", other]) {
+    const open = marker + inner;
+    const close = inner + marker;
+    if (before.endsWith(open) && after.startsWith(close)) {
+      const v = before.slice(0, before.length - open.length) + inner + selected + inner + after.slice(close.length);
+      return { value: v, selectionStart: start - n, selectionEnd: end - n };
+    }
   }
-  // 선택 자체가 **…** 이면 벗긴다
-  if (selected.length >= 4 && selected.startsWith("**") && selected.endsWith("**") && !selected.slice(2, -2).includes("**")) {
-    const inner = selected.slice(2, -2);
+  // 선택 안에 marker가 있으면(여러 구간 포함) 전부 벗긴다 — 겹쳐 감싸 깨지지 않게 (Gemini strike #5)
+  if (selected.includes(marker)) {
+    const inner = selected.split(marker).join("");
     return { value: before + inner + after, selectionStart: start, selectionEnd: start + inner.length };
   }
-  const v = `${before}**${selected}**${after}`;
-  return { value: v, selectionStart: start + 2, selectionEnd: end + 2 };
+  const v = `${before}${marker}${selected}${marker}${after}`;
+  return { value: v, selectionStart: start + n, selectionEnd: end + n };
+}
+
+/** **굵게** 토글 */
+export function toggleBold(value: string, start: number, end: number): Edit {
+  return toggleWrap(value, start, end, "**");
+}
+
+/** ~~취소선~~ 토글 (사용자 요청 2026-11-20) */
+export function toggleStrike(value: string, start: number, end: number): Edit {
+  return toggleWrap(value, start, end, "~~");
 }
 
 /**

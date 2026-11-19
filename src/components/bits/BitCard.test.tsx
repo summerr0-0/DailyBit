@@ -146,3 +146,25 @@ describe("bold formatting", () => {
     expect(container.textContent).toBe("2 ** 3 is power");
   });
 });
+
+describe("strikethrough", () => {
+  it("renders ~~text~~ as <del>, also nested with bold", async () => {
+    const { renderBitContent } = await import("./bit-content");
+    const { render } = await import("@testing-library/react");
+    const { container } = render(<p>{renderBitContent("~~old~~ and **~~both~~**")}</p>);
+    const dels = container.querySelectorAll("del");
+    expect([...dels].map((d) => d.textContent)).toEqual(["old", "both"]);
+    expect(container.querySelector("strong del")?.textContent).toBe("both");
+  });
+});
+
+describe("strikethrough flanking rules", () => {
+  it("ignores casual tildes and stray marker runs", async () => {
+    const { renderBitContent } = await import("./bit-content");
+    const { render } = await import("@testing-library/react");
+    const a = render(<p>{renderBitContent("반가워~~ 오늘 ~~일정~~ 취소")}</p>).container;
+    expect([...a.querySelectorAll("del")].map((d) => d.textContent)).toEqual(["일정"]);
+    const b = render(<p>{renderBitContent("~~~~ 안녕 ~~취소~~")}</p>).container;
+    expect([...b.querySelectorAll("del")].map((d) => d.textContent)).toEqual(["취소"]);
+  });
+});

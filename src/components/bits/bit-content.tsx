@@ -36,15 +36,30 @@ function renderTags(text: string, offset: number): ReactNode[] {
 
 // URL 구간을 먼저 떼어낸 뒤 나머지 텍스트에서만 #태그를 링크로 만든다 (spec D13).
 // **굵게** — 줄을 넘지 않는 짝지어진 ** 사이만 (사용자 요청 2026-11-20)
-const BOLD_PATTERN = /\*\*([^\n]+?)\*\*/g;
+// **굵게**, ~~취소선~~ — 마크다운처럼 기호 바로 안쪽에 공백·기호가 없을 때만 (Gemini strike #2~#4).
+// "반가워~~ 오늘 ~~일정~~"의 앞 ~~는 서식이 아니다. 서로 감싸는 것은 허용(**~~x~~**).
+// 기호별로: 같은 기호가 붙어 있지 않고, 안쪽 끝이 공백·같은 기호가 아닐 때만. 다른 기호는 안쪽에 와도 된다.
+const MARK_PATTERN =
+  /(?<!\*)\*\*(?![\s*])([^\n]*?[^\s*])\*\*(?!\*)|(?<!~)~~(?![\s~])([^\n]*?[^\s~])~~(?!~)/g;
 
-function renderBoldAndTags(text: string, offset: number): ReactNode[] {
+function renderBoldAndTags(text: string, offset: number, depth = 0): ReactNode[] {
+  if (depth > 2) return renderTags(text, offset);
   const nodes: ReactNode[] = [];
   let last = 0;
-  for (const m of text.matchAll(BOLD_PATTERN)) {
+  for (const m of text.matchAll(MARK_PATTERN)) {
     const start = m.index ?? 0;
     if (start > last) nodes.push(...renderTags(text.slice(last, start), offset + last));
-    nodes.push(<strong key={`b${offset + start}`}>{renderTags(m[1], offset + start + 2)}</strong>);
+    const isBold = m[1] !== undefined;
+    const inner = renderBoldAndTags(isBold ? m[1] : m[2], offset + start + 2, depth + 1);
+    nodes.push(
+      isBold ? (
+        <strong key={`b${offset + start}`}>{inner}</strong>
+      ) : (
+        <del key={`s${offset + start}`} style={{ color: "#8A8170" }}>
+          {inner}
+        </del>
+      ),
+    );
     last = start + m[0].length;
   }
   if (last < text.length) nodes.push(...renderTags(text.slice(last), offset + last));

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
-import { insertWikiLink, toggleBold, toggleHeading, wikiQueryAt, type Edit } from "./text-format";
+import { insertWikiLink, toggleBold, toggleHeading, toggleStrike, wikiQueryAt, type Edit } from "./text-format";
 
 // Bit 입력창 공용 컴포넌트 (spec: wiki-links D3, D6 + 2026-11-20 굵게 요청).
 // 서식 버튼 B · H1 · H2 · H3, 단축키 ⌘/Ctrl+B, `[[` 입력 시 Thread·개념 제목 자동완성.
@@ -84,6 +84,11 @@ export function RichTextarea({ value, onChange, onKeyDown, rows = 6, placeholder
       }
       if (e.key === "Escape") return (e.preventDefault(), setQuery(null));
     }
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "x" || e.key === "X")) {
+      e.preventDefault();
+      const el = ref.current;
+      return apply(toggleStrike(value, el?.selectionStart ?? value.length, el?.selectionEnd ?? value.length));
+    }
     if ((e.metaKey || e.ctrlKey) && (e.key === "b" || e.key === "B")) {
       e.preventDefault();
       const el = ref.current;
@@ -92,6 +97,10 @@ export function RichTextarea({ value, onChange, onKeyDown, rows = 6, placeholder
     onKeyDown?.(e);
   }
 
+  const strike = () => {
+    const el = ref.current;
+    apply(toggleStrike(value, el?.selectionStart ?? value.length, el?.selectionEnd ?? value.length));
+  };
   const heading = (level: 1 | 2 | 3) => apply(toggleHeading(value, ref.current?.selectionStart ?? value.length, level));
   const bold = () => {
     const el = ref.current;
@@ -103,6 +112,9 @@ export function RichTextarea({ value, onChange, onKeyDown, rows = 6, placeholder
       <div style={{ display: "flex", gap: 4, marginBottom: 6 }} role="toolbar" aria-label="Formatting">
         <ToolButton label="Bold" title="Bold (⌘/Ctrl+B) — **text**" onClick={bold} weight={800}>
           B
+        </ToolButton>
+        <ToolButton label="Strikethrough" title="Strikethrough (⌘/Ctrl+Shift+X) — ~~text~~" onClick={strike} strike>
+          S
         </ToolButton>
         <ToolButton label="Heading 1" title="Heading 1 — # at line start" onClick={() => heading(1)}>
           H1
@@ -187,12 +199,14 @@ function ToolButton({
   title,
   onClick,
   weight = 700,
+  strike = false,
   children,
 }: {
   label: string;
   title: string;
   onClick: () => void;
   weight?: number;
+  strike?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -214,6 +228,7 @@ function ToolButton({
         color: "#3C3220",
         cursor: "pointer",
         fontFamily: "inherit",
+        textDecoration: strike ? "line-through" : "none",
       }}
     >
       {children}
