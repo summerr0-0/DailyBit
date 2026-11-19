@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   AllFeedsFailedError,
+  ScoringUnavailableError,
   createMemoryStore,
   roundRobinBySource,
   runCuration,
@@ -156,16 +157,16 @@ describe("scoring (R4.1, R4.2, R4.5)", () => {
     expect(statusOf(mem, "hi")?.status).toBe("DRAFTED");
   });
 
-  it("records persistently unscorable items as SKIPPED(score_failed) and still drafts from the existing pool", async () => {
+  it("treats total scoring failure as a system problem: records nothing and throws", async () => {
     const initial = [row({ id: "prev", sourceId: "deepmind" })];
     const { deps, mem } = makeDeps({
       feeds: [{ sourceId: "openai", items: [entry("new", hoursAgo(1))] }],
       initial,
       scores: () => null,
     });
-    await runCuration(deps);
-    expect(statusOf(mem, "new")).toMatchObject({ status: "SKIPPED", skipReason: "score_failed" });
-    expect(statusOf(mem, "prev")?.status).toBe("DRAFTED");
+    await expect(runCuration(deps)).rejects.toBeInstanceOf(ScoringUnavailableError);
+    expect(statusOf(mem, "new")).toBeUndefined(); // 다음 실행에서 다시 채점
+    expect(mem.drafts).toHaveLength(0);
   });
 
   it("leaves items the model omitted unrecorded so they are re-scored next run", async () => {

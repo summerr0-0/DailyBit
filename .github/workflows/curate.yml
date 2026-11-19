@@ -32,6 +32,14 @@ jobs:
       - run: pnpm db:generate
       # AI는 Claude Code CLI로 호출 — API 키 대신 Claude 구독 토큰(`claude setup-token`) 사용
       - run: npm install -g @anthropic-ai/claude-code@2.1.328
+      # 구독 토큰 인증 확인 — 실패하면 원인(인증·모델 접근)이 여기서 그대로 보이고 curate는 돌지 않는다.
+      - name: Check Claude CLI auth
+        run: |
+          out=$(claude -p "Reply with the single word OK." --model claude-haiku-5-5 --output-format json --tools "" --strict-mcp-config --no-session-persistence 2>&1) || true
+          echo "$out" | head -c 600; echo
+          echo "$out" | grep -q '"is_error":false' || { echo "::error::Claude CLI auth/model check failed"; exit 1; }
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       - name: Curate
         run: pnpm tsx scripts/curate.ts
         env:

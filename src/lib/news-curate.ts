@@ -88,6 +88,14 @@ export type CurationSummary = {
   skippedSelected: number;
 };
 
+/** 배치·묶음 채점이 모두 실패 — 인증·한도 같은 시스템 문제로 보고 아무것도 기록하지 않는다. */
+export class ScoringUnavailableError extends Error {
+  constructor() {
+    super("scoring unavailable: every scoring call failed");
+    this.name = "ScoringUnavailableError";
+  }
+}
+
 export class AllFeedsFailedError extends Error {
   constructor() {
     super("all feeds failed");
@@ -241,15 +249,24 @@ export async function runCuration(deps: CurationDeps): Promise<CurationSummary> 
       for (const e of toScore) record(e, whole.scores[e.urlNormalized]);
     } else {
       log("batch scoring failed — retrying in chunks");
+      const failedChunks: FreshEntry[][] = [];
+      let anyChunkOk = false;
       for (let i = 0; i < toScore.length; i += SCORE_FALLBACK_CHUNK) {
         const chunk = toScore.slice(i, i + SCORE_FALLBACK_CHUNK);
         const r = await scoreBatch(chunk);
         if (r.ok) {
+          anyChunkOk = true;
           for (const e of chunk) record(e, r.scores[e.urlNormalized]);
         } else {
-          for (const e of chunk) scoredItems.push(toNewItem(e, "SKIPPED", null, "score_failed"));
-          log(`chunk scoring failed — ${chunk.length} items skipped`);
+          failedChunks.push(chunk);
         }
+      }
+      // 전부 실패 = 기사 탓이 아니라 시스템 문제(인증·한도·장애) → 기록 없이 실패로 끝내 다음 실행에서 재시도.
+      if (!anyChunkOk) throw new ScoringUnavailableError();
+      // 일부만 실패 = 그 묶음의 기사가 원인일 가능성 → SKIPPED(score_failed)로 막힘 방지.
+      for (const chunk of failedChunks) {
+        for (const e of chunk) scoredItems.push(toNewItem(e, "SKIPPED", null, "score_failed"));
+        log(`chunk scoring failed — ${chunk.length} items skipped`);
       }
     }
     if (scoredItems.length) await store.insertFeedItems(scoredItems);
