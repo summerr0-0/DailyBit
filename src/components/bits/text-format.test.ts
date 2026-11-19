@@ -17,9 +17,9 @@ describe("toggleBold", () => {
 });
 
 describe("toggleBold across several bold spans", () => {
-  it("wraps instead of breaking markup when two bold spans are selected", () => {
+  it("unwraps every bold span when a multi-span selection is toggled", () => {
     const v = "**a** and **b**";
-    expect(toggleBold(v, 0, v.length).value).toBe("****a** and **b****");
+    expect(toggleBold(v, 0, v.length).value).toBe("a and b");
   });
 });
 
@@ -50,5 +50,25 @@ describe("wiki autocomplete helpers", () => {
 describe("toggleHeading edge (Gemini wiki #3)", () => {
   it("handles a leading empty line with the cursor at 0", () => {
     expect(toggleHeading("\nsecond", 0, 1).value).toBe("# \nsecond");
+  });
+});
+
+import { toggleStrike } from "./text-format";
+
+describe("toggleStrike", () => {
+  it("wraps and unwraps ~~", () => {
+    expect(toggleStrike("old plan", 0, 3)).toEqual({ value: "~~old~~ plan", selectionStart: 2, selectionEnd: 5 });
+    expect(toggleStrike("~~old~~ plan", 2, 5)).toEqual({ value: "old plan", selectionStart: 0, selectionEnd: 3 });
+  });
+});
+
+describe("toggleWrap with nested / multiple marks (Gemini strike review)", () => {
+  it("removes an outer mark across one inner mark", () => {
+    const v = "**~~text~~**";
+    expect(toggleBold(v, 4, 8).value).toBe("~~text~~");
+  });
+  it("removes all marks of that kind inside a multi-span selection", () => {
+    const v = "~~a~~ ~~b~~";
+    expect(toggleStrike(v, 0, v.length).value).toBe("a b");
   });
 });
