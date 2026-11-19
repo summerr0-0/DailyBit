@@ -226,7 +226,7 @@ export function DraftCard({
   }
 
   return (
-    <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 18, padding: "18px 20px" }}>
+    <div data-testid="draft-card" style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 18, padding: "18px 20px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: ACCENT }}>
           {isThread ? `Thread · ${segments.length} bits` : "Single Bit"}

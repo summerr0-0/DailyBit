@@ -59,7 +59,8 @@ test("owner reviews a news draft in the inbox and publishes it with a clickable 
   await expect(meta).toContainText("expires in");
   await expect(meta).toContainText("number_not_in_source:40");
 
-  const card = inbox.locator("div", { has: page.locator(`textarea:has-text("${HEADLINE}")`) }).last();
+  const card = inbox.getByTestId("draft-card").filter({ has: page.locator(`textarea:has-text("${HEADLINE}")`) });
+  await expect(card).toHaveCount(1);
   await card.getByRole("button", { name: "Publish" }).click();
   await expect(page.locator("textarea", { hasText: HEADLINE })).toHaveCount(0);
 
