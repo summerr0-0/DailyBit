@@ -47,6 +47,7 @@ export function BitCard({ bit, isLoggedIn = false }: Props) {
           style={{ display: "block", fontSize: "12.5px", color: "#C96820", fontWeight: 600, marginTop: "4px", textDecoration: "none" }}
         >
           Thread: {bit.thread.title}
+          {bit.thread.bitCount && bit.thread.bitCount > 1 ? ` · ${bit.thread.bitCount} bits →` : " →"}
         </Link>
       )}
 
@@ -67,7 +68,7 @@ export function BitCard({ bit, isLoggedIn = false }: Props) {
         <LikeButton bitId={bit.id} likeCount={bit.likeCount} />
         <RebitButton bitId={bit.id} rebitCount={bit.rebitCount} isLoggedIn={isLoggedIn} />
         <CommentSection bitId={bit.id} commentCount={bit.commentCount} isLoggedIn={isLoggedIn} />
-        {isLoggedIn && <ThreadReplyButton bitId={bit.id} />}
+        {isLoggedIn && <ThreadReplyButton bitId={bit.id} hasThread={bit.thread !== null} defaultTitle={Array.from(bit.content.replace(/\s+/g, " ").trim()).slice(0, 60).join("")} />}
       </div>
     </article>
   );

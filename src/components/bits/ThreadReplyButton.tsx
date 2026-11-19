@@ -1,20 +1,32 @@
 "use client";
 
-import { useState, type KeyboardEvent } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
+import { FormatToolbar, handleBoldShortcut } from "./FormatToolbar";
 
 const MAX_LENGTH = 500;
 
-type Props = { bitId: string };
+type Props = {
+  bitId: string;
+  /** 이 Bit가 이미 Thread에 속하면 true — 아니면 이어쓰기가 새 Thread를 만들므로 제목을 받는다 */
+  hasThread?: boolean;
+  /** 새 Thread 제목 기본값 (원래 Bit 앞부분) */
+  defaultTitle?: string;
+};
 
-export function ThreadReplyButton({ bitId }: Props) {
+const TITLE_MAX = 100;
+
+export function ThreadReplyButton({ bitId, hasThread = false, defaultTitle = "" }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState("");
+  const [title, setTitle] = useState(defaultTitle.slice(0, TITLE_MAX));
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = content.trim().length > 0 && content.length <= MAX_LENGTH && !submitting;
+  const titleOk = hasThread || (title.trim().length > 0 && title.length <= TITLE_MAX);
+  const canSubmit = content.trim().length > 0 && content.length <= MAX_LENGTH && titleOk && !submitting;
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -24,7 +36,7 @@ export function ThreadReplyButton({ bitId }: Props) {
       const res = await fetch(`/api/bits/${bitId}/thread-reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify(hasThread ? { content } : { content, title: title.trim() }),
       });
       if (!res.ok) throw new Error();
       setContent("");
@@ -38,6 +50,7 @@ export function ThreadReplyButton({ bitId }: Props) {
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (handleBoldShortcut(e, textareaRef, content, setContent)) return;
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       void handleSubmit();
@@ -97,14 +110,39 @@ export function ThreadReplyButton({ bitId }: Props) {
             boxShadow: "0 8px 32px rgba(42,38,32,0.12)",
           }}>
             <p style={{ fontSize: "12.5px", color: "#C96820", fontWeight: 600, marginBottom: "12px" }}>
-              ↳ Continue thread
+              ↳ {hasThread ? "Continue thread" : "Start a thread"}
             </p>
+            {!hasThread && (
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Thread title"
+                maxLength={TITLE_MAX}
+                aria-label="Thread title"
+                style={{
+                  width: "100%",
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  border: "1px solid #E0D6C4",
+                  borderRadius: "10px",
+                  padding: "8px 12px",
+                  marginBottom: "10px",
+                  background: "transparent",
+                  fontFamily: "inherit",
+                  color: "#33302A",
+                  outline: "none",
+                }}
+              />
+            )}
+            <FormatToolbar textareaRef={textareaRef} value={content} onChange={setContent} />
             <textarea
+              ref={textareaRef}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Write your next step... (⌘↵ to post)"
-              rows={4}
+              placeholder="Write your next step... (⌘↵ to post, ⌘B bold)"
+              rows={7}
               autoFocus
               style={{
                 width: "100%",
@@ -113,7 +151,8 @@ export function ThreadReplyButton({ bitId }: Props) {
                 border: "none",
                 outline: "none",
                 background: "transparent",
-                resize: "none",
+                resize: "vertical",
+                minHeight: "140px",
                 fontFamily: "inherit",
                 color: "#33302A",
               }}

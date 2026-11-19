@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { FormatToolbar, handleBoldShortcut } from "@/components/bits/FormatToolbar";
 import { useRouter } from "next/navigation";
 import type { ScrapDraftDTO } from "@/lib/scrap-drafts";
 
@@ -265,12 +266,7 @@ export function DraftCard({
           const over = seg.length > MAX;
           return (
             <div key={i} style={{ borderTop: i > 0 ? "1px solid #F0EADC" : "none", paddingTop: i > 0 ? 12 : 0 }}>
-              <textarea
-                value={seg}
-                onChange={(e) => updateSegment(i, e.target.value)}
-                rows={3}
-                style={{ ...inputStyle, resize: "vertical" }}
-              />
+              <SegmentEditor value={seg} onChange={(v) => updateSegment(i, v)} />
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
                 <span style={{ fontSize: 11.5, color: over ? "#C0392B" : MUTED }}>{seg.length}/{MAX}</span>
                 {segments.length > 1 && (
@@ -342,3 +338,23 @@ const ghostBtn: React.CSSProperties = {
   color: MUTED,
   cursor: "pointer",
 };
+
+/** 초안 세그먼트 입력 — 굵게(B, ⌘/Ctrl+B) + 넓은 입력창 (사용자 요청 2026-11-20) */
+function SegmentEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  return (
+    <>
+      <FormatToolbar textareaRef={ref} value={value} onChange={onChange} />
+      <textarea
+        ref={ref}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          handleBoldShortcut(e, ref, value, onChange);
+        }}
+        rows={7}
+        style={{ ...inputStyle, resize: "vertical", minHeight: 150 }}
+      />
+    </>
+  );
+}

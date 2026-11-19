@@ -1,12 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { ensureDevUser, createBit } from "@/lib/bits";
 import { createThread } from "@/lib/threads";
+import { threadUrl } from "@/lib/site-url";
 import {
   appendSourceSegment,
+  conceptLinkBit,
   expiryCutoffs,
   isStale,
   newsConceptBits,
   planConceptPublish,
+  relatedNewsBit,
   SOURCE_ADDED_LATER,
 } from "@/lib/draft-hooks";
 
@@ -529,6 +532,7 @@ async function publishEventDraft(
     }),
     prisma.scrapDraft.deleteMany({ where: { id: draftId } }),
   ]);
+  await reconcileConceptLinks(eventKey);
   return { ok: true, kind: "thread", id: threadId };
 }
 
@@ -580,6 +584,7 @@ async function publishConceptDraft(
     }),
     prisma.scrapDraft.deleteMany({ where: { id: draftId } }),
   ]);
+  for (const key of eventKeys) await reconcileConceptLinks(key);
   return { ok: true, kind: "thread", id: threadId };
 }
 
@@ -593,4 +598,47 @@ export async function getConceptStatuses(slugs: string[]): Promise<ConceptStatus
     select: { slug: true, term: true, status: true, draftId: true },
   });
   return rows.map((r) => ({ slug: r.slug, term: r.term, status: r.status, hasDraft: r.draftId !== null }));
+}
+
+/**
+ * 사건 ↔ 개념 링크를 맞춘다 — 발행이 끝날 때마다 호출 (2026-11-20 운영에서 발견한 동시 발행 경합 수정).
+ * 사건이 발행됐고 연결된 개념도 발행됐다면: 뉴스 Thread에 개념 링크 Bit, 개념 Thread에 관련 뉴스 Bit가
+ * 없을 때만 추가한다(URL 포함 여부로 중복 방지). 두 발행이 겹쳐도 나중에 끝나는 쪽이 빠진 링크를 채운다.
+ */
+export async function reconcileConceptLinks(eventKey: string): Promise<{ added: number }> {
+  const event = await prisma.newsEvent.findUnique({
+    where: { eventKey },
+    select: { status: true, threadId: true, title: true },
+  });
+  if (!event || event.status !== "PUBLISHED" || !event.threadId) return { added: 0 };
+  const newsThread = await prisma.thread.findUnique({ where: { id: event.threadId }, select: { id: true, title: true } });
+  if (!newsThread) return { added: 0 };
+
+  const links = await prisma.conceptEvent.findMany({
+    where: { eventKey },
+    select: { concept: { select: { term: true, status: true, threadId: true } } },
+  });
+  const newsBits = await prisma.bit.findMany({ where: { threadId: newsThread.id }, select: { content: true } });
+  let added = 0;
+  for (const { concept } of links) {
+    if (concept.status !== "PUBLISHED" || !concept.threadId) continue;
+    const conceptThread = await prisma.thread.findUnique({ where: { id: concept.threadId }, select: { id: true } });
+    if (!conceptThread) continue;
+
+    const conceptUrl = threadUrl(conceptThread.id);
+    if (!newsBits.some((b) => b.content.includes(conceptUrl))) {
+      await createBit({ content: conceptLinkBit(concept.term, conceptThread.id), threadId: newsThread.id, aiCollab: "LED" });
+      added++;
+    }
+    const newsUrl = threadUrl(newsThread.id);
+    const conceptBits = await prisma.bit.findMany({ where: { threadId: conceptThread.id }, select: { content: true } });
+    if (!conceptBits.some((b) => b.content.includes(newsUrl))) {
+      const related = relatedNewsBit([{ title: newsThread.title, threadId: newsThread.id }]);
+      if (related) {
+        await createBit({ content: related, threadId: conceptThread.id, aiCollab: "LED" });
+        added++;
+      }
+    }
+  }
+  return { added };
 }
