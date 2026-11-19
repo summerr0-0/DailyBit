@@ -1,52 +1,44 @@
 import { test, expect } from "@playwright/test";
-import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
-import { PrismaClient } from "../src/generated/prisma/client";
 
 // News inbox (spec: news-curation R9.2–R9.4, R0.2, R10.1).
 // CI 격리 DB에 NEWS 초안을 직접 넣고, 오너로 /scrap에서 확인 → 발행 → 피드에 링크 있는 Bit가 뜨는지 본다.
+// Playwright는 Prisma 생성 클라이언트(ESM)를 불러오지 못하므로 pg로 직접 SQL을 쓴다.
 
-const prisma = new PrismaClient({ adapter: new PrismaPg(new Pool({ connectionString: process.env.DATABASE_URL })) });
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const STAMP = Date.now();
 const URL = `https://news.example/e2e-${STAMP}`;
 const HEADLINE = `E2E headline ${STAMP}`;
+const FEED_ID = `e2e_feed_${STAMP}`;
+const DRAFT_ID = `e2e_draft_${STAMP}`;
 
 test.beforeAll(async () => {
-  const author = await prisma.user.upsert({
-    where: { email: "dev@dailybit.dev" },
-    update: {},
-    create: { email: "dev@dailybit.dev", nickname: "devuser" },
-  });
-  const item = await prisma.feedItem.create({
-    data: {
-      url: URL,
-      urlNormalized: URL,
-      sourceId: "krebs",
-      title: "E2E source article",
-      publishedAt: new Date(),
-      score: 8,
-      status: "DRAFTED",
-    },
-  });
-  await prisma.scrapDraft.create({
-    data: {
-      kind: "NEWS",
-      sourceType: "URL",
-      sourceUrl: URL,
-      sourceTitle: "E2E source article",
-      sourceLabel: "Krebs on Security",
-      rawExtract: "body",
-      segments: [`${HEADLINE}\n- Fact one.\n- Fact two.\n\n${URL}\n#security`],
-      warnings: ["number_not_in_source:40"],
-      feedItemId: item.id,
-      authorId: author.id,
-    },
-  });
+  await pool.query(
+    `INSERT INTO users (id, email, nickname, "createdAt", "updatedAt")
+     VALUES ($1, 'dev@dailybit.dev', 'devuser', now(), now()) ON CONFLICT (email) DO NOTHING`,
+    [`e2e_user_${STAMP}`],
+  );
+  const { rows } = await pool.query(`SELECT id FROM users WHERE email = 'dev@dailybit.dev'`);
+  const authorId = rows[0].id as string;
+
+  await pool.query(
+    `INSERT INTO feed_items (id, url, "urlNormalized", "sourceId", title, "publishedAt", score, status, "updatedAt")
+     VALUES ($1, $2, $2, 'krebs', 'E2E source article', now(), 8, 'DRAFTED'::"FeedItemStatus", now())`,
+    [FEED_ID, URL],
+  );
+  await pool.query(
+    `INSERT INTO scrap_drafts (id, kind, "sourceType", "sourceUrl", "sourceTitle", "sourceLabel", "rawExtract",
+       segments, warnings, "feedItemId", "authorId", "updatedAt")
+     VALUES ($1, 'NEWS'::"DraftKind", 'URL'::"SourceType", $2, 'E2E source article', 'Krebs on Security', 'body',
+       $3::jsonb, ARRAY['number_not_in_source:40'], $4, $5, now())`,
+    [DRAFT_ID, URL, JSON.stringify([`${HEADLINE}\n- Fact one.\n- Fact two.\n\n${URL}\n#security`]), FEED_ID, authorId],
+  );
 });
 
 test.afterAll(async () => {
-  await prisma.feedItem.deleteMany({ where: { urlNormalized: URL } });
-  await prisma.$disconnect();
+  await pool.query(`DELETE FROM scrap_drafts WHERE id = $1`, [DRAFT_ID]);
+  await pool.query(`DELETE FROM feed_items WHERE id = $1`, [FEED_ID]);
+  await pool.end();
 });
 
 test("visitor sees no drafts on /scrap", async ({ page }) => {

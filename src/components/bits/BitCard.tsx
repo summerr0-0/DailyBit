@@ -36,7 +36,7 @@ function renderTags(text: string, offset: number): ReactNode[] {
 
 // URL 구간을 먼저 떼어낸 뒤 나머지 텍스트에서만 #태그를 링크로 만든다 (spec D13).
 function renderContent(content: string): ReactNode[] {
-  return splitByUrls(content).flatMap((segment) =>
+  return splitByUrls(content).flatMap<ReactNode>((segment) =>
     segment.type === "url"
       ? [
           <a
