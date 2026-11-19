@@ -1,3 +1,4 @@
+import type { LinkTargets } from "@/lib/wiki-links";
 import type { BitWithAuthor } from "@/lib/bits";
 import { BitCard } from "./BitCard";
 
@@ -6,9 +7,10 @@ type Props = {
   message: string | null;
   bit: BitWithAuthor;
   isLoggedIn?: boolean;
+  links?: LinkTargets;
 };
 
-export function RebitCard({ rebitAtLabel, message, bit, isLoggedIn }: Props) {
+export function RebitCard({ rebitAtLabel, message, bit, isLoggedIn, links }: Props) {
   return (
     <div>
       <div style={{
@@ -42,7 +44,7 @@ export function RebitCard({ rebitAtLabel, message, bit, isLoggedIn }: Props) {
           {message}
         </p>
       )}
-      <BitCard bit={bit} isLoggedIn={isLoggedIn} />
+      <BitCard bit={bit} isLoggedIn={isLoggedIn} links={links} />
     </div>
   );
 }

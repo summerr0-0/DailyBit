@@ -207,3 +207,13 @@ describe("buildConceptThread (D6)", () => {
   });
 });
 
+
+import { keepAllowedWikiLinks } from "./news-compose";
+
+describe("keepAllowedWikiLinks (wiki-links D5)", () => {
+  it("keeps brackets only around allowed concept terms", () => {
+    expect(keepAllowedWikiLinks("needs a [[Gadget Chain]] and [[PHP]] [[x|shown]]", ["gadget chain"])).toBe(
+      "needs a [[Gadget Chain]] and PHP shown",
+    );
+  });
+});

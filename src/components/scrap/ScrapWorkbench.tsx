@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { FormatToolbar, handleBoldShortcut } from "@/components/bits/FormatToolbar";
+import { useState } from "react";
+import { RichTextarea } from "@/components/bits/RichTextarea";
 import { useRouter } from "next/navigation";
 import type { ScrapDraftDTO } from "@/lib/scrap-drafts";
 
@@ -341,20 +341,7 @@ const ghostBtn: React.CSSProperties = {
 
 /** 초안 세그먼트 입력 — 굵게(B, ⌘/Ctrl+B) + 넓은 입력창 (사용자 요청 2026-11-20) */
 function SegmentEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
   return (
-    <>
-      <FormatToolbar textareaRef={ref} value={value} onChange={onChange} />
-      <textarea
-        ref={ref}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          handleBoldShortcut(e, ref, value, onChange);
-        }}
-        rows={7}
-        style={{ ...inputStyle, resize: "vertical", minHeight: 150 }}
-      />
-    </>
+    <RichTextarea value={value} onChange={onChange} rows={7} style={{ ...inputStyle, resize: "vertical", minHeight: 150 }} />
   );
 }

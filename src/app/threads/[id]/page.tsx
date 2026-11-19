@@ -3,15 +3,20 @@ import Link from "next/link";
 import { getThread } from "@/lib/threads";
 import { getTagCloud } from "@/lib/bits";
 import { isLoggedIn } from "@/lib/auth";
+import { getBacklinks, getLinkTargets } from "@/lib/link-targets";
+import { pickLinks } from "@/lib/wiki-links";
 import { EditableBitContent, ThreadTitle } from "@/components/threads/ThreadEditors";
 
 type Props = { params: Promise<{ id: string }> };
 
 export default async function ThreadPage({ params }: Props) {
   const { id } = await params;
-  const [thread, tagCloud, owner] = await Promise.all([getThread(id), getTagCloud(), isLoggedIn()]);
+  const [thread, tagCloud, owner, links] = await Promise.all([getThread(id), getTagCloud(), isLoggedIn(), getLinkTargets()]);
 
   if (!thread) notFound();
+  const backlinks = await getBacklinks(thread.id, owner);
+  // 클라이언트 컴포넌트로는 이 페이지 본문이 실제로 가리키는 링크만 넘긴다 (Gemini wiki #1)
+  const pageLinks = pickLinks(links, thread.bits.map((b) => b.content));
 
   return (
     <div style={{ minHeight: "100vh", background: "#F4F0E7", padding: "32px 20px 80px" }}>
@@ -114,7 +119,7 @@ export default async function ThreadPage({ params }: Props) {
                         day: "numeric",
                       })}
                     </p>
-                    <EditableBitContent bitId={bit.id} content={bit.content} editable={owner} />
+                    <EditableBitContent bitId={bit.id} content={bit.content} editable={owner} links={pageLinks} />
                     {bit.tags.length > 0 && (
                       <div style={{ marginTop: "10px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
                         {bit.tags.map((tag) => (
@@ -154,6 +159,29 @@ export default async function ThreadPage({ params }: Props) {
                 </li>
               )}
             </ol>
+
+            {/* 백링크: 이 Thread를 [[ ]]로 가리키는 글 (spec wiki-links D4) */}
+            {backlinks.length > 0 && (
+              <section aria-labelledby="backlinks-heading" style={{ marginTop: "28px", background: "#FFFDF8", border: "1px solid #E8E1D2", borderRadius: "16px", padding: "16px 18px" }}>
+                <h2 id="backlinks-heading" style={{ fontSize: "13px", fontWeight: 700, color: "#8A8170", letterSpacing: "0.4px", margin: "0 0 10px" }}>
+                  Linked from ({backlinks.length})
+                </h2>
+                <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {backlinks.map((b) => (
+                    <li key={b.bitId}>
+                      {b.threadId ? (
+                        <Link href={`/threads/${b.threadId}`} style={{ fontSize: "14px", fontWeight: 600, color: "#B05A18", textDecoration: "none" }}>
+                          {b.title}
+                        </Link>
+                      ) : (
+                        <span style={{ fontSize: "14px", fontWeight: 600, color: "#33302A" }}>{b.title}</span>
+                      )}
+                      <p style={{ fontSize: "12.5px", color: "#A89E89", margin: "2px 0 0" }}>{b.snippet}</p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           </div>
 
           {/* Sidebar: categories */}

@@ -336,6 +336,7 @@ Output fields:
 - sources: one entry per source, using its index. point = one sentence (under 160 characters) on what that source adds beyond the others (e.g. official announcement, hands-on testing, benchmark numbers, criticism).
 - tags: 1 to 3 lowercase topic tags without "#", single words (e.g. "llm", "vulnerability", "openai").
 - concepts: 0 to 2 technical terms from the event that a beginner developer would likely not know and would benefit from a short explainer (e.g. "quantization", "prompt injection"). Skip common words and product names. If a term in <known_concepts> means the same thing, use that exact wording. Each with aliases: other common spellings or names (may be empty).
+- Inline concept links: in the bullets, wrap the FIRST mention of each term you list in concepts (and of any <known_concepts> term you use) in double square brackets with exactly the concept's wording, e.g. "the bug needs a [[gadget chain]] in the app". Do not bracket anything else, and never in the headline.
 
 Rules:
 ${TONE_RULES}

@@ -21,6 +21,7 @@ import {
   buildSourceBit,
   checkNumbersMulti,
   findBannedPhrases,
+  keepAllowedWikiLinks,
   stripUrls,
 } from "@/lib/news-compose";
 import { findSplitSuspects, normalizeConceptSlug, normalizeEventKey } from "@/lib/news-events";
@@ -504,6 +505,13 @@ export async function runCuration(deps: CurationDeps): Promise<CurationSummary> 
 
       // 개념 정리 (v2 D5, D14-5): 기존 개념 매칭 → 재사용 / 새 개념은 실행당 2개까지만
       const plan = planConcepts(gen.output.concepts, concepts, MAX_CONCEPT_DRAFTS_PER_RUN - conceptDraftsThisRun);
+      // 본문 [[개념]] 링크: 이번 사건에 연결되는 개념어(+별칭)만 남긴다 (spec wiki-links D5)
+      // 상한에 걸린 개념도 괄호는 남긴다 — 나중에 그 개념이 생기면 자동으로 링크가 된다 (Gemini wiki #6, D2)
+      const linkTerms = [
+        ...concepts.filter((c) => c.status !== "REJECTED").flatMap((c) => [c.term, ...c.aliases]),
+        ...gen.output.concepts.flatMap((c) => [c.term, ...c.aliases]),
+      ];
+      built.segments = built.segments.map((seg) => keepAllowedWikiLinks(seg, linkTerms));
 
       const warnings = [
         ...built.warnings,

@@ -4,10 +4,8 @@ import { createThread } from "@/lib/threads";
 import { threadUrl } from "@/lib/site-url";
 import {
   appendSourceSegment,
-  conceptLinkBit,
   expiryCutoffs,
   isStale,
-  newsConceptBits,
   planConceptPublish,
   relatedNewsBit,
   SOURCE_ADDED_LATER,
@@ -516,14 +514,8 @@ async function publishEventDraft(
   title: string,
   segments: string[],
 ): Promise<PublishResult> {
-  const concepts =
-    conceptSlugs.length > 0
-      ? await prisma.concept.findMany({
-          where: { slug: { in: conceptSlugs } },
-          select: { slug: true, term: true, status: true, threadId: true },
-        })
-      : [];
-  const threadId = await createThreadWithBits(title, [...segments, ...newsConceptBits(conceptSlugs, concepts)]);
+  // 개념 링크는 본문 [[ ]] 인라인으로 (spec wiki-links D5) — 끝에 "New to this?" Bit를 붙이지 않는다
+  const threadId = await createThreadWithBits(title, segments);
 
   await prisma.$transaction([
     prisma.newsEvent.updateMany({
@@ -573,9 +565,7 @@ async function publishConceptDraft(
       .map((e) => ({ title: e.title, threadId: e.threadId as string })),
   );
   if (plan.relatedBit) await createBit({ content: plan.relatedBit, threadId, aiCollab: "LED" });
-  for (const b of plan.backlinks) {
-    await createBit({ content: b.content, threadId: b.threadId, aiCollab: "LED" });
-  }
+  // 뉴스 Thread에 백링크 Bit를 붙이지 않는다 — Thread 페이지의 Linked from이 대신 보여준다 (wiki-links D5)
 
   await prisma.$transaction([
     prisma.concept.updateMany({
@@ -618,18 +608,13 @@ export async function reconcileConceptLinks(eventKey: string): Promise<{ added: 
     where: { eventKey },
     select: { concept: { select: { term: true, status: true, threadId: true } } },
   });
-  const newsBits = await prisma.bit.findMany({ where: { threadId: newsThread.id }, select: { content: true } });
   let added = 0;
   for (const { concept } of links) {
     if (concept.status !== "PUBLISHED" || !concept.threadId) continue;
     const conceptThread = await prisma.thread.findUnique({ where: { id: concept.threadId }, select: { id: true } });
     if (!conceptThread) continue;
 
-    const conceptUrl = threadUrl(conceptThread.id);
-    if (!newsBits.some((b) => b.content.includes(conceptUrl))) {
-      await createBit({ content: conceptLinkBit(concept.term, conceptThread.id), threadId: newsThread.id, aiCollab: "LED" });
-      added++;
-    }
+    // 뉴스 → 개념 링크는 본문 [[ ]]가 맡는다 (wiki-links D5). 개념 → 뉴스 "Related news"만 보장.
     const newsUrl = threadUrl(newsThread.id);
     const conceptBits = await prisma.bit.findMany({ where: { threadId: conceptThread.id }, select: { content: true } });
     if (!conceptBits.some((b) => b.content.includes(newsUrl))) {

@@ -1,15 +1,14 @@
 "use client";
 
-import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { FormatToolbar, handleBoldShortcut } from "./FormatToolbar";
+import { RichTextarea } from "./RichTextarea";
 const MAX_LENGTH = 500;
 const WARN_THRESHOLD = MAX_LENGTH - 50;
 
 export function BitComposer() {
   const router = useRouter();
   const [content, setContent] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isPrivate, setIsPrivate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +45,6 @@ export function BitComposer() {
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (handleBoldShortcut(e, textareaRef, content, setContent)) return;
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       void submit();
@@ -71,15 +69,13 @@ export function BitComposer() {
       }}
     >
       <div className="space-y-2">
-          <FormatToolbar textareaRef={textareaRef} value={content} onChange={setContent} />
-          <textarea
-            ref={textareaRef}
+          <RichTextarea
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={setContent}
             onKeyDown={handleKeyDown}
-            placeholder="What are you learning today? Try #tags and **bold**"
+            placeholder="What are you learning today? Try #tags, **bold**, # heading, [[link]]"
             rows={6}
-            aria-label="Bit content"
+            ariaLabel="Bit content"
             className="w-full resize-y bg-transparent text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
             style={{ minHeight: 120 }}
           />

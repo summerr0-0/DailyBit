@@ -1,3 +1,4 @@
+import { linkKey } from "./wiki-links";
 // 뉴스 초안 조립·린트 (spec: news-curation D9 / R6.1~R6.5).
 // LLM의 구조화 출력 {headline, bullets, tags}를 코드가 단일 Bit 본문으로 조립한다.
 // 순수 함수만 둔다(I/O 없음) — 스크립트와 테스트에서 그대로 쓴다.
@@ -253,4 +254,15 @@ export function buildConceptThread(input: { term: string; definition: string; wh
 /** checkNumbers와 같은 규칙을 여러 출처 본문 합본 기준으로 적용한다(D4, R3.4). */
 export function checkNumbersMulti(text: string, rawExtracts: readonly string[]): string[] {
   return checkNumbers(text, rawExtracts.join("\n"));
+}
+
+/**
+ * 허용된 개념어만 [[링크]]로 남기고 나머지 [[...]]는 괄호를 벗긴다 (spec wiki-links D5).
+ * 모델이 개념 목록에 없는 말을 괄호로 감싸는 실수를 막는다.
+ */
+export function keepAllowedWikiLinks(text: string, allowedTerms: readonly string[]): string {
+  const allowed = new Set(allowedTerms.map(linkKey));
+  return text.replace(/\[\[([^\[\]\n|]{1,100})(\|[^\[\]\n]{1,100})?\]\]/g, (raw, target: string, label?: string) =>
+    allowed.has(linkKey(target)) ? raw : (label ? label.slice(1) : target),
+  );
 }

@@ -4,6 +4,7 @@ import { getBitsByTag, getTagCloud } from "@/lib/bits";
 import { isLoggedIn } from "@/lib/auth";
 import { isPrivateTag } from "@/lib/privateTags";
 import { BitCard } from "@/components/bits/BitCard";
+import { getLinkTargets } from "@/lib/link-targets";
 import { BitActionsMenu } from "@/components/bits/BitActionsMenu";
 
 export const dynamic = "force-dynamic";
@@ -22,9 +23,10 @@ export default async function TagPage({
   const privateTag = await isPrivateTag(normalized);
   if (privateTag && !loggedIn) notFound();
 
-  const [bits, tagCloud] = await Promise.all([
+  const [bits, tagCloud, links] = await Promise.all([
     getBitsByTag(normalized, loggedIn),
     getTagCloud(loggedIn),
+    getLinkTargets(),
   ]);
 
   return (
@@ -71,7 +73,7 @@ export default async function TagPage({
               <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                 {bits.map((bit) => (
                   <div key={bit.id} style={{ position: "relative" }}>
-                    <BitCard bit={bit} isLoggedIn={loggedIn} />
+                    <BitCard bit={bit} isLoggedIn={loggedIn} links={links} />
                     {loggedIn && (
                       <div style={{ position: "absolute", right: "12px", top: "12px" }}>
                         <BitActionsMenu bitId={bit.id} pinned={bit.pinned} isPrivate={bit.private} />

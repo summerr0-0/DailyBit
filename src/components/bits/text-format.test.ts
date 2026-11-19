@@ -22,3 +22,33 @@ describe("toggleBold across several bold spans", () => {
     expect(toggleBold(v, 0, v.length).value).toBe("****a** and **b****");
   });
 });
+
+import { insertWikiLink, toggleHeading, wikiQueryAt } from "./text-format";
+
+describe("toggleHeading", () => {
+  it("adds, switches and removes heading on the cursor line", () => {
+    expect(toggleHeading("intro\ntitle\nend", 8, 2).value).toBe("intro\n## title\nend");
+    expect(toggleHeading("intro\n## title\nend", 10, 1).value).toBe("intro\n# title\nend");
+    expect(toggleHeading("# title", 3, 1).value).toBe("title");
+  });
+});
+
+describe("wiki autocomplete helpers", () => {
+  it("detects the [[ query before the cursor", () => {
+    expect(wikiQueryAt("see [[gad", 9)).toEqual({ query: "gad", start: 4 });
+    expect(wikiQueryAt("see [[done]] x", 14)).toBeNull();
+  });
+  it("replaces the partial with a complete link", () => {
+    expect(insertWikiLink("see [[gad", 9, 4, "gadget chain")).toEqual({
+      value: "see [[gadget chain]]",
+      selectionStart: 20,
+      selectionEnd: 20,
+    });
+  });
+});
+
+describe("toggleHeading edge (Gemini wiki #3)", () => {
+  it("handles a leading empty line with the cursor at 0", () => {
+    expect(toggleHeading("\nsecond", 0, 1).value).toBe("# \nsecond");
+  });
+});

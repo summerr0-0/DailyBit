@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { renderBitContent } from "./bit-content";
 import type { BitWithAuthor } from "@/lib/bits";
+import type { LinkTargets } from "@/lib/wiki-links";
 import { RebitButton } from "./RebitButton";
 import { LikeButton } from "./LikeButton";
 import { CommentSection } from "./CommentSection";
 import { ThreadReplyButton } from "./ThreadReplyButton";
 
-type Props = { bit: BitWithAuthor; isLoggedIn?: boolean };
+type Props = { bit: BitWithAuthor; isLoggedIn?: boolean; links?: LinkTargets };
 
-export function BitCard({ bit, isLoggedIn = false }: Props) {
+export function BitCard({ bit, isLoggedIn = false, links }: Props) {
   return (
     <article
       style={{
@@ -52,7 +53,7 @@ export function BitCard({ bit, isLoggedIn = false }: Props) {
       )}
 
       <p style={{ marginTop: "5px", fontSize: "15.5px", lineHeight: 1.68, color: "#33302A", whiteSpace: "pre-wrap" }}>
-        {renderBitContent(bit.content)}
+        {renderBitContent(bit.content, links)}
       </p>
 
       {/* Action bar — flex-wrap so comment panel falls to next row */}

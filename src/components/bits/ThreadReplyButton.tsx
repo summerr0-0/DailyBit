@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { FormatToolbar, handleBoldShortcut } from "./FormatToolbar";
+import { RichTextarea } from "./RichTextarea";
 
 const MAX_LENGTH = 500;
 
@@ -21,7 +21,6 @@ export function ThreadReplyButton({ bitId, hasThread = false, defaultTitle = "" 
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState("");
   const [title, setTitle] = useState(defaultTitle.slice(0, TITLE_MAX));
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +49,6 @@ export function ThreadReplyButton({ bitId, hasThread = false, defaultTitle = "" 
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (handleBoldShortcut(e, textareaRef, content, setContent)) return;
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       void handleSubmit();
@@ -135,14 +133,13 @@ export function ThreadReplyButton({ bitId, hasThread = false, defaultTitle = "" 
                 }}
               />
             )}
-            <FormatToolbar textareaRef={textareaRef} value={content} onChange={setContent} />
-            <textarea
-              ref={textareaRef}
+            <RichTextarea
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={setContent}
               onKeyDown={handleKeyDown}
-              placeholder="Write your next step... (⌘↵ to post, ⌘B bold)"
+              placeholder="Write your next step... (⌘↵ to post, ⌘B bold, [[ to link)"
               rows={7}
+              ariaLabel="Thread reply"
               autoFocus
               style={{
                 width: "100%",
