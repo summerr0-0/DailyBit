@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState, type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { renderBitContent } from "@/components/bits/bit-content";
-import { FormatToolbar, handleBoldShortcut } from "@/components/bits/FormatToolbar";
+import type { LinkTargets } from "@/lib/wiki-links";
+import { RichTextarea } from "@/components/bits/RichTextarea";
 
 // Thread 페이지 오너 편집 (사용자 요청 2026-11-20): 제목 수정, 각 Bit 본문 수정.
 // 비로그인 방문자에게는 편집 버튼이 렌더되지 않고, API도 requireAuth로 막혀 있다.
@@ -74,13 +75,22 @@ export function ThreadTitle({ threadId, title, editable }: { threadId: string; t
   );
 }
 
-export function EditableBitContent({ bitId, content, editable }: { bitId: string; content: string; editable: boolean }) {
+export function EditableBitContent({
+  bitId,
+  content,
+  editable,
+  links,
+}: {
+  bitId: string;
+  content: string;
+  editable: boolean;
+  links?: LinkTargets;
+}) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(content);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const ref = useRef<HTMLTextAreaElement>(null);
 
   async function save() {
     if (saving) return;
@@ -103,7 +113,7 @@ export function EditableBitContent({ bitId, content, editable }: { bitId: string
     return (
       <>
         <p style={{ fontSize: 15, lineHeight: 1.68, color: "#33302A", whiteSpace: "pre-wrap", margin: 0 }}>
-          {renderBitContent(content)}
+          {renderBitContent(content, links)}
         </p>
         {editable && (
           <button type="button" onClick={() => { setValue(content); setError(null); setEditing(true); }} style={{ ...linkBtn, marginTop: 8 }} aria-label="Edit this bit">
@@ -115,19 +125,16 @@ export function EditableBitContent({ bitId, content, editable }: { bitId: string
   }
   return (
     <div>
-      <FormatToolbar textareaRef={ref} value={value} onChange={setValue} />
-      <textarea
-        ref={ref}
+      <RichTextarea
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={setValue}
         onKeyDown={(e) => {
-          if (handleBoldShortcut(e, ref, value, setValue)) return;
           if (e.nativeEvent.isComposing) return;
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void save();
           if (e.key === "Escape") { setValue(content); setEditing(false); }
         }}
         rows={8}
-        aria-label="Bit content"
+        ariaLabel="Bit content"
         autoFocus
         style={{ width: "100%", minHeight: 160, fontSize: 15, lineHeight: 1.65, border: "1px solid #E0D6C4", borderRadius: 10, padding: "10px 12px", background: "transparent", outline: "none", resize: "vertical", fontFamily: "inherit", color: "#33302A" }}
       />

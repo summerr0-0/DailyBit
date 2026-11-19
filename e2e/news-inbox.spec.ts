@@ -73,7 +73,7 @@ test("owner reviews a news draft in the inbox and publishes it with a clickable 
   await expect(link).toHaveAttribute("rel", "noopener noreferrer nofollow");
 });
 
-// v2 (spec: news-curation-v2 R6.1, R8.1): 사건 Thread 초안 → 발행 → 이미 발행된 개념 링크 Bit가 붙는다.
+// v2 + wiki-links D5: 사건 Thread 발행 → 본문 [[개념]]이 개념 Thread로 링크되고, 개념 Thread엔 Linked from이 생긴다.
 test.describe("v2 event thread", () => {
   const V2 = `v2-${STAMP}`;
   const EVENT_KEY = `e2e-event-${STAMP}`;
@@ -104,7 +104,7 @@ test.describe("v2 event thread", () => {
         DRAFT2,
         `https://news.example/${V2}`,
         JSON.stringify([
-          `${V2_HEADLINE}\n- Fact one.\n- Fact two.\n\n#ai`,
+          `${V2_HEADLINE}\n- Needs an [[E2E Concept]] to work.\n- Fact two.\n\n#ai`,
           `Source: OpenAI News — Point one.\nhttps://news.example/${V2}-a`,
           `Source: Simon Willison — Point two.\nhttps://news.example/${V2}-b`,
         ]),
@@ -126,7 +126,7 @@ test.describe("v2 event thread", () => {
     await pool.query(`DELETE FROM concepts WHERE id = $1`, [CONCEPT_ID]);
   });
 
-  test("publishing an event thread appends a link to the already-published concept", async ({ page }) => {
+  test("publishing an event thread links the concept inline and shows up in the concept's Linked from", async ({ page }) => {
     const login = await page.request.post("/api/auth/login", { data: { passphrase: process.env.ADMIN_PASSPHRASE } });
     expect(login.ok()).toBe(true);
     await page.goto("/scrap");
@@ -142,8 +142,12 @@ test.describe("v2 event thread", () => {
     expect(rows[0].status).toBe("PUBLISHED");
     await page.goto(`/threads/${rows[0].threadId}`);
     await expect(page.getByText(V2_HEADLINE).first()).toBeVisible();
-    const conceptLink = page.getByRole("link", { name: new RegExp(`/threads/${CONCEPT_THREAD}$`) });
-    await expect(conceptLink).toHaveCount(1);
-    await expect(page.getByText("New to this? E2E Concept")).toBeVisible();
+    const inline = page.getByRole("link", { name: "E2E Concept" });
+    await expect(inline).toHaveAttribute("href", `/threads/${CONCEPT_THREAD}`);
+    await expect(page.getByText("New to this?")).toHaveCount(0);
+
+    await page.goto(`/threads/${CONCEPT_THREAD}`);
+    const linkedFrom = page.locator("section", { has: page.getByRole("heading", { name: /Linked from/ }) });
+    await expect(linkedFrom).toContainText(V2_HEADLINE);
   });
 });
