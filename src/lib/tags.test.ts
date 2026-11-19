@@ -29,4 +29,12 @@ describe("parseTags", () => {
   it("태그가 없으면 빈 배열을 반환한다", () => {
     expect(parseTags("그냥 평범한 글입니다")).toEqual([]);
   });
+
+  it("URL fragment의 # 은 태그로 보지 않는다", () => {
+    expect(parseTags("https://a.com/p#frag #ai")).toEqual(["ai"]);
+  });
+
+  it("URL 바로 뒤 문장부호 다음의 태그는 추출한다", () => {
+    expect(parseTags("see https://a.com/x. #ai")).toEqual(["ai"]);
+  });
 });

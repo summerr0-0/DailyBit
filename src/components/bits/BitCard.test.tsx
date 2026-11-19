@@ -79,4 +79,51 @@ describe("BitCard", () => {
     render(<BitCard bit={base} />);
     expect(screen.getAllByRole("button").length).toBeGreaterThanOrEqual(2);
   });
+
+  describe("URL 링크화 (R10)", () => {
+    it("R10.1: URL은 새 탭 링크, 끝 마침표는 밖, #ai는 태그 링크", () => {
+      const { container } = render(<BitCard bit={bitWith("see https://a.com/x. #ai", ["ai"])} />);
+      const link = screen.getByRole("link", { name: "https://a.com/x" });
+      expect(link).toHaveAttribute("href", "https://a.com/x");
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer nofollow");
+      expect(screen.getByRole("link", { name: "#ai" })).toHaveAttribute("href", "/tags/ai");
+      expect(container.querySelector("p")?.textContent).toBe("see https://a.com/x. #ai");
+    });
+
+    it("R10.2: 바깥 괄호는 링크에서 제외한다", () => {
+      render(<BitCard bit={bitWith("(https://a.com/x)")} />);
+      expect(screen.getByRole("link")).toHaveAttribute("href", "https://a.com/x");
+    });
+
+    it("R10.2: URL 안의 _(b)는 링크에 포함한다", () => {
+      render(<BitCard bit={bitWith("https://en.wikipedia.org/wiki/A_(b)")} />);
+      expect(screen.getByRole("link")).toHaveAttribute(
+        "href",
+        "https://en.wikipedia.org/wiki/A_(b)",
+      );
+    });
+
+    it("R10.2: 괄호로 감싼 위키 URL은 _(b)까지 링크, 바깥 ) 제외", () => {
+      render(<BitCard bit={bitWith("(https://en.wikipedia.org/wiki/A_(b))")} />);
+      expect(screen.getByRole("link")).toHaveAttribute(
+        "href",
+        "https://en.wikipedia.org/wiki/A_(b)",
+      );
+    });
+
+    it("R10.3: URL fragment는 태그가 아니라 URL 링크의 일부다", () => {
+      render(<BitCard bit={bitWith("https://a.com/p#frag #ai", ["ai"])} />);
+      const links = screen.getAllByRole("link");
+      expect(links).toHaveLength(2);
+      expect(links[0]).toHaveAttribute("href", "https://a.com/p#frag");
+      expect(links[1]).toHaveAttribute("href", "/tags/ai");
+    });
+
+    it("R10.4: javascript:와 ftp://는 일반 텍스트다", () => {
+      render(<BitCard bit={bitWith("javascript:alert(1) ftp://x")} />);
+      expect(screen.queryByRole("link")).not.toBeInTheDocument();
+      expect(screen.getByText("javascript:alert(1) ftp://x")).toBeInTheDocument();
+    });
+  });
 });

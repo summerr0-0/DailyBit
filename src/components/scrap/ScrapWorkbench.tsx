@@ -165,7 +165,16 @@ export function ScrapWorkbench({ initialDrafts }: { initialDrafts: ScrapDraftDTO
   );
 }
 
-function DraftCard({ draft, onDone }: { draft: ScrapDraftDTO; onDone: () => void }) {
+export function DraftCard({
+  draft,
+  onDone,
+  extra,
+}: {
+  draft: ScrapDraftDTO;
+  onDone: () => void;
+  /** 카드 상단 추가 정보 (News inbox: 소스·만료·경고). */
+  extra?: React.ReactNode;
+}) {
   const router = useRouter();
   const [segments, setSegments] = useState<string[]>(draft.segments);
   const [title, setTitle] = useState(draft.suggestedThreadTitle ?? "");
@@ -217,7 +226,7 @@ function DraftCard({ draft, onDone }: { draft: ScrapDraftDTO; onDone: () => void
   }
 
   return (
-    <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 18, padding: "18px 20px" }}>
+    <div data-testid="draft-card" style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 18, padding: "18px 20px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: ACCENT }}>
           {isThread ? `Thread · ${segments.length} bits` : "Single Bit"}
@@ -228,6 +237,8 @@ function DraftCard({ draft, onDone }: { draft: ScrapDraftDTO; onDone: () => void
           </a>
         )}
       </div>
+
+      {extra}
 
       {isThread && (
         <input

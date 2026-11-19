@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ensureDevUser, createBit } from "@/lib/bits";
 import { createThread } from "@/lib/threads";
+import { NEWS_DRAFT_TTL_MS } from "@/lib/news-expiry";
 
 // ScrapDraft CRUD + 발행 (spec: tech-scrap T5/T6 / R3, R4).
 // segments는 문자열 배열로 저장한다. 각 문자열이 발행 후보 Bit 1개이며, 태그는 본문 인라인 #hashtag로 들어간다.
@@ -10,6 +11,7 @@ const MAX_SEGMENT_CHARS = 500;
 const MAX_THREAD_TITLE_CHARS = 100;
 
 export type ScrapSourceType = "URL" | "TEXT" | "YOUTUBE";
+export type DraftKind = "MANUAL" | "NEWS";
 
 export type ScrapDraftDTO = {
   id: string;
@@ -19,6 +21,9 @@ export type ScrapDraftDTO = {
   rawExtract: string;
   segments: string[];
   suggestedThreadTitle: string | null;
+  kind: DraftKind;
+  sourceLabel: string | null;
+  warnings: string[];
   createdAt: string;
 };
 
@@ -30,6 +35,9 @@ type ScrapDraftRow = {
   rawExtract: string;
   segments: unknown;
   suggestedThreadTitle: string | null;
+  kind: DraftKind;
+  sourceLabel: string | null;
+  warnings: string[];
   createdAt: Date;
 };
 
@@ -41,6 +49,9 @@ const DRAFT_SELECT = {
   rawExtract: true,
   segments: true,
   suggestedThreadTitle: true,
+  kind: true,
+  sourceLabel: true,
+  warnings: true,
   createdAt: true,
 } as const;
 
@@ -57,6 +68,9 @@ function toDraftDTO(row: ScrapDraftRow): ScrapDraftDTO {
     rawExtract: row.rawExtract,
     segments: toSegments(row.segments),
     suggestedThreadTitle: row.suggestedThreadTitle,
+    kind: row.kind,
+    sourceLabel: row.sourceLabel,
+    warnings: row.warnings,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -85,11 +99,56 @@ export async function createDraft(input: {
   return toDraftDTO(row as ScrapDraftRow);
 }
 
-/** 오너 전용 draft 목록 (최신순). */
-export async function getDrafts(): Promise<ScrapDraftDTO[]> {
+/**
+ * 자동 뉴스 초안을 저장하고 FeedItem을 DRAFTED로 바꾼다 — 한 트랜잭션 (spec: news-curation D10, R6.6).
+ * 수동 스크랩은 createDraft를 그대로 쓴다.
+ */
+export async function createNewsDraft(input: {
+  feedItemId: string;
+  sourceUrl: string;
+  sourceTitle: string;
+  sourceLabel: string;
+  rawExtract: string;
+  content: string;
+  warnings: string[];
+}): Promise<ScrapDraftDTO> {
+  const author = await ensureDevUser();
+  const row = await prisma.$transaction(async (tx) => {
+    const draft = await tx.scrapDraft.create({
+      data: {
+        kind: "NEWS",
+        sourceType: "URL",
+        sourceUrl: input.sourceUrl,
+        sourceTitle: input.sourceTitle,
+        sourceLabel: input.sourceLabel,
+        rawExtract: input.rawExtract,
+        segments: [input.content],
+        suggestedThreadTitle: null,
+        warnings: input.warnings,
+        feedItemId: input.feedItemId,
+        authorId: author.id,
+      },
+      select: DRAFT_SELECT,
+    });
+    await tx.feedItem.update({ where: { id: input.feedItemId }, data: { status: "DRAFTED" } });
+    return draft;
+  });
+  return toDraftDTO(row as ScrapDraftRow);
+}
+
+/** 보관 기간(3일)이 지난 NEWS 초안을 삭제한다. MANUAL 초안은 건드리지 않는다 (R8.1). */
+export async function deleteExpiredNewsDrafts(now: Date = new Date()): Promise<number> {
+  const { count } = await prisma.scrapDraft.deleteMany({
+    where: { kind: "NEWS", createdAt: { lt: new Date(now.getTime() - NEWS_DRAFT_TTL_MS) } },
+  });
+  return count;
+}
+
+/** 오너 전용 draft 목록 (최신순). kind를 주면 해당 종류만, 없으면 전체 (R9.1). */
+export async function getDrafts(opts: { kind?: DraftKind } = {}): Promise<ScrapDraftDTO[]> {
   const author = await ensureDevUser();
   const rows = await prisma.scrapDraft.findMany({
-    where: { authorId: author.id },
+    where: { authorId: author.id, ...(opts.kind ? { kind: opts.kind } : {}) },
     orderBy: { createdAt: "desc" },
     select: DRAFT_SELECT,
   });

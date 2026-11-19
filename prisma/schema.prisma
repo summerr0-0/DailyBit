@@ -19,6 +19,20 @@ enum SourceType {
   YOUTUBE
 }
 
+// 초안 출처: 수동 스크랩(MANUAL) vs 자동 뉴스 큐레이션(NEWS). spec: news-curation D10
+enum DraftKind {
+  MANUAL
+  NEWS
+}
+
+// 자동 수집 기사 상태. spec: news-curation D15 상태 전이표
+enum FeedItemStatus {
+  CANDIDATE
+  SKIPPED
+  FAILED
+  DRAFTED
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -44,28 +58,28 @@ model Thread {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bits      Bit[]
+  bits Bit[]
 
   @@map("threads")
 }
 
 model Bit {
-  id        String    @id @default(cuid())
-  content   String    @db.VarChar(500)
+  id        String   @id @default(cuid())
+  content   String   @db.VarChar(500)
   tags      String[]
-  aiCollab  AiCollab  @default(NONE)
-  pinned    Boolean   @default(false)
-  private   Boolean   @default(false)
+  aiCollab  AiCollab @default(NONE)
+  pinned    Boolean  @default(false)
+  private   Boolean  @default(false)
   authorId  String
-  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
   threadId  String?
-  thread    Thread?   @relation(fields: [threadId], references: [id], onDelete: SetNull)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  thread    Thread?  @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  rebits    Rebit[]
-  likes     Like[]
-  comments  Comment[]
+  rebits   Rebit[]
+  likes    Like[]
+  comments Comment[]
 
   @@map("bits")
 }
@@ -123,11 +137,40 @@ model ScrapDraft {
   rawExtract           String     @db.Text
   segments             Json
   suggestedThreadTitle String?    @db.VarChar(100)
+  kind                 DraftKind  @default(MANUAL)
+  sourceLabel          String?
+  warnings             String[]   @default([])
+  feedItemId           String?    @unique
+  feedItem             FeedItem?  @relation(fields: [feedItemId], references: [id], onDelete: SetNull)
   authorId             String
   author               User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
   createdAt            DateTime   @default(now())
   updatedAt            DateTime   @updatedAt
 
   @@index([authorId])
+  @@index([kind, createdAt])
   @@map("scrap_drafts")
+}
+
+// 자동 뉴스 큐레이션이 본 기사. urlNormalized로 중복 제거하고 status로 재처리 여부를 결정한다.
+// spec: news-curation D5, D15
+model FeedItem {
+  id            String         @id @default(cuid())
+  url           String
+  urlNormalized String         @unique
+  sourceId      String
+  title         String
+  summary       String?        @db.Text
+  publishedAt   DateTime?
+  firstSeenAt   DateTime       @default(now())
+  score         Int?
+  status        FeedItemStatus
+  skipReason    String?
+  attempts      Int            @default(0)
+  updatedAt     DateTime       @updatedAt
+
+  draft ScrapDraft?
+
+  @@index([status, publishedAt])
+  @@map("feed_items")
 }

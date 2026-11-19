@@ -1,6 +1,8 @@
 import { isLoggedIn } from "@/lib/auth";
 import { getDrafts } from "@/lib/scrap-drafts";
 import { ScrapWorkbench } from "@/components/scrap/ScrapWorkbench";
+import { NewsInbox } from "@/components/scrap/NewsInbox";
+import { isNewsDraftExpired, newsExpiryLabel } from "@/lib/news-expiry";
 
 // 테크 글 스크랩 페이지 — 오너(Irin) 전용. 방문자에게는 draft가 노출되지 않는다(R3.3, R5.1).
 export default async function ScrapPage() {
@@ -17,7 +19,13 @@ export default async function ScrapPage() {
     );
   }
 
-  const drafts = await getDrafts();
+  const [drafts, newsDrafts] = await Promise.all([getDrafts({ kind: "MANUAL" }), getDrafts({ kind: "NEWS" })]);
+  const now = new Date();
+  // 만료 삭제는 cron이 하므로 그 사이 보관 기간이 지난 초안은 화면에서 숨긴다 (Gemini diff review #5)
+  const newsItems = newsDrafts.filter((d) => !isNewsDraftExpired(new Date(d.createdAt), now)).map((draft) => ({
+    draft,
+    expiryLabel: newsExpiryLabel(new Date(draft.createdAt), now),
+  }));
 
   return (
     <div style={{ maxWidth: 680, margin: "0 auto", padding: "28px 20px 80px" }}>
@@ -27,6 +35,7 @@ export default async function ScrapPage() {
           Paste a URL (or the raw text) and let AI draft a Bit or Thread. Nothing is published until you confirm.
         </p>
       </header>
+      <NewsInbox initialItems={newsItems} />
       <ScrapWorkbench initialDrafts={drafts} />
     </div>
   );
