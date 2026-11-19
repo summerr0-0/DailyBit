@@ -1,23 +1,16 @@
+import { notFound } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { getDrafts } from "@/lib/scrap-drafts";
 import { ScrapWorkbench } from "@/components/scrap/ScrapWorkbench";
 import { NewsInbox } from "@/components/scrap/NewsInbox";
 import { isNewsDraftExpired, newsExpiryLabel } from "@/lib/news-expiry";
 
-// 테크 글 스크랩 페이지 — 오너(Irin) 전용. 방문자에게는 draft가 노출되지 않는다(R3.3, R5.1).
+// 테크 글 스크랩 + 뉴스 인박스 — 오너(Irin) 전용. 방문자는 404 (R3.3, R5.1, news-curation R9.3).
 export default async function ScrapPage() {
   const owner = await isLoggedIn();
 
-  if (!owner) {
-    return (
-      <div style={{ maxWidth: 640, margin: "0 auto", padding: "40px 20px" }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: "#3C3220" }}>Scrap</h1>
-        <p style={{ marginTop: 12, fontSize: 14, color: "#B4AB97" }}>
-          This workspace is for the blog owner only. Please log in to use it.
-        </p>
-      </div>
-    );
-  }
+  // 방문자에게는 페이지 존재 자체를 숨긴다 (404). 오너는 /login 후 로그인 완료 화면의 링크로 들어온다.
+  if (!owner) notFound();
 
   const [drafts, newsDrafts] = await Promise.all([getDrafts({ kind: "MANUAL" }), getDrafts({ kind: "NEWS" })]);
   const now = new Date();

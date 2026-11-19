@@ -41,8 +41,9 @@ test.afterAll(async () => {
   await pool.end();
 });
 
-test("visitor sees no drafts on /scrap", async ({ page }) => {
-  await page.goto("/scrap");
+test("visitor gets a 404 on /scrap and sees no drafts", async ({ page }) => {
+  const res = await page.goto("/scrap");
+  expect(res?.status()).toBe(404);
   await expect(page.getByText("News inbox")).toHaveCount(0);
   await expect(page.getByText(HEADLINE)).toHaveCount(0);
 });
