@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { isLoggedIn } from "@/lib/auth";
 import { verifyAndDeleteComment, deleteComment } from "@/lib/comments";
 
 export async function DELETE(
@@ -7,8 +7,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const cookieStore = await cookies();
-  const isOwner = cookieStore.get("db_auth")?.value === "1";
+  const isOwner = await isLoggedIn();
 
   if (isOwner) {
     // Blog owner can always delete

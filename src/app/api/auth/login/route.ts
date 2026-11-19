@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { SESSION_COOKIE, SESSION_MAX_AGE_SEC, createSessionToken } from "@/lib/session";
 
 // Simple in-memory rate limiter: 5 attempts per IP per 15 minutes.
 // Survives across warm Vercel invocations; resets on cold start (acceptable for personal blog).
@@ -43,12 +44,12 @@ export async function POST(request: Request) {
   }
 
   const cookieStore = await cookies();
-  cookieStore.set("db_auth", "1", {
+  cookieStore.set(SESSION_COOKIE, createSessionToken(expected), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
     path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: SESSION_MAX_AGE_SEC,
   });
 
   return NextResponse.json({ ok: true });
@@ -56,6 +57,6 @@ export async function POST(request: Request) {
 
 export async function DELETE() {
   const cookieStore = await cookies();
-  cookieStore.delete("db_auth");
+  cookieStore.delete(SESSION_COOKIE);
   return NextResponse.json({ ok: true });
 }
