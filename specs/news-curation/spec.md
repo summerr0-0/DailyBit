@@ -456,3 +456,9 @@
 - 피드 항목은 http(s) 절대 URL만, 빈 피드는 [], Atom text/html/xhtml 타입별 처리(`Vec&lt;T&gt;` 보존).
 - /scrap은 cron 사이에 보관 기간이 지난 NEWS 초안을 숨김.
 - 기각: linkify의 `(url)#tag` 붙은 경우(드묾), stripUrls 후 괄호 잔여(경고로 사람이 확인), "1,2" 숫자 오탐(경고만).
+
+### 변경 (2026-11-18): AI 백엔드 = Claude Code CLI (사용자 결정)
+- API 키(`ANTHROPIC_API_KEY`) 대신 Claude 구독으로 실행: GitHub Actions에서 `@anthropic-ai/claude-code`를 설치하고 `claude -p --json-schema`로 호출, 인증은 `claude setup-token`으로 만든 `CLAUDE_CODE_OAUTH_TOKEN` secret.
+- `src/lib/news-ai-cli.ts`가 NewsAiClient를 구현(도구·MCP·설정·세션 저장 끔, 시스템 프롬프트 대체). `NEWS_AI_BACKEND=cli`로 선택, 미설정 시 기존 SDK 경로.
+- 반려안: 맥 launchd 로컬 실행(맥이 켜져 있어야 함), Gemini agy(할당량 적음·리뷰 전용, 로컬 전용).
+- 로컬 실측: Haiku 채점(관련 9 / 웨비나 1), Sonnet 생성 → 조립까지 정상.

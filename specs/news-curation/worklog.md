@@ -15,8 +15,10 @@
 - Gemini diff 리뷰 12건 → 9 반영, 3 기각 (`gemini-diff-review.md`, spec Implementation Notes)
 - 검증: unit 172/172, tsc, eslint, dry-run 통과. e2e는 로컬 Docker 없어 CI에서 확인 예정
 
+- 2026-11-18 추가: PR #21(오너 세션 쿠키 서명) 머지 `97b05d8`. CI 러너 ubuntu-24.04 고정(Playwright가 26.04 미지원).
+- AI 백엔드를 Claude Code CLI(구독 토큰)로 전환 — `news-ai-cli.ts`, curate.yml. 로컬 CLI 실호출로 채점·생성 확인.
+
 ## 남은 일
 - PR 머지 직전 운영 DB `db push` (feed_items, scrap_drafts 컬럼 추가)
-- GitHub `production` Environment + secrets(DATABASE_URL=Session Pooler, ANTHROPIC_API_KEY)
+- GitHub `production` Environment + secrets(DATABASE_URL=Session Pooler, CLAUDE_CODE_OAUTH_TOKEN=`claude setup-token`)
 - 머지 후 workflow_dispatch 1회 수동 실행
-- 별건: 오너 인증 쿠키(`db_auth=1`) 위조 가능 — 별도 PR로 서명 쿠키 전환 필요

@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { NewsOutput } from "./news-compose";
+import { createCliClient } from "./news-ai-cli";
 
 // 뉴스 큐레이션 AI 호출 (spec: news-curation D7 채점 / D9 생성).
 // scrap-ai.ts와 같은 방식: 지연 생성 클라이언트, json_schema 구조화 출력, 거부 처리, 예외 대신 결과 객체.
@@ -19,9 +20,10 @@ export type NewsAiClient = {
   };
 };
 
+// 백엔드: NEWS_AI_BACKEND=cli → Claude Code CLI(구독, API 키 불필요), 그 외 → Anthropic SDK(ANTHROPIC_API_KEY).
 let _client: NewsAiClient | null = null;
 function getClient(): NewsAiClient {
-  if (!_client) _client = new Anthropic();
+  if (!_client) _client = process.env.NEWS_AI_BACKEND === "cli" ? createCliClient() : new Anthropic();
   return _client;
 }
 
