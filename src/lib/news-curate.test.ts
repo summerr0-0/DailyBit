@@ -423,3 +423,49 @@ describe("Gemini diff review regressions", () => {
     expect(plan.draft.map((c) => c.slug)).toEqual(["brandnewidea"]);
   });
 });
+
+describe("event merge check (fix/event-grouping)", () => {
+  it("merges candidate events the checker says are the same release into one Thread", async () => {
+    const feeds: FeedResult[] = [
+      { sourceId: "openai", items: [entry("php-a", hoursAgo(1))] },
+      { sourceId: "krebs", items: [entry("php-b", hoursAgo(2))] },
+    ];
+    const { deps, mem, generateEvent } = makeDeps({
+      feeds,
+      scores: (keys) => Object.fromEntries(keys.map((k) => [k, [8, k.endsWith("/php-a") ? "phpaftershell-cve" : "php-fixes-7"]])),
+    });
+    deps.mergeEvents = vi.fn(async () => ({ ok: true as const, merges: [{ from: "php-fixes-7", into: "phpaftershell-cve" }] }));
+    await runCuration(deps);
+    expect(generateEvent).toHaveBeenCalledTimes(1);
+    expect(newsDrafts(mem)).toHaveLength(1);
+    expect(newsDrafts(mem)[0].segments).toHaveLength(3);
+    expect(itemOf(mem, "php-b")?.eventKey).toBe("phpaftershell-cve");
+  });
+
+  it("routes a candidate merged into an open inbox event through the late-source path", async () => {
+    const first = makeDeps({ feeds: [{ sourceId: "openai", items: [entry("o1", hoursAgo(3))] }], scores: (k) => ({ [k[0]]: [9, "php-release"] }) });
+    await runCuration(first.deps);
+    const second = {
+      ...first.deps,
+      fetchAll: async () => [{ sourceId: "krebs", items: [entry("k1", hoursAgo(1))] }] as FeedResult[],
+      score: async (items: { key: string }[]) => ({
+        ok: true as const,
+        results: Object.fromEntries(items.map((i) => [i.key, { score: 8, event: "php-single-cve" }])),
+        scores: Object.fromEntries(items.map((i) => [i.key, 8])),
+      }),
+      mergeEvents: async () => ({ ok: true as const, merges: [{ from: "php-single-cve", into: "php-release" }] }),
+    };
+    await runCuration(second);
+    expect(first.generateEvent).toHaveBeenCalledTimes(1);
+    expect(newsDrafts(first.mem)[0].segments).toHaveLength(3);
+    expect(newsDrafts(first.mem)[0].warnings).toContain("source_added_later");
+  });
+
+  it("continues unchanged when the merge check fails", async () => {
+    const feeds: FeedResult[] = [{ sourceId: "openai", items: [entry("a", hoursAgo(1)), entry("b", hoursAgo(1))] }];
+    const { deps, generateEvent } = makeDeps({ feeds });
+    deps.mergeEvents = async () => ({ ok: false as const });
+    await runCuration(deps);
+    expect(generateEvent).toHaveBeenCalledTimes(2);
+  });
+});

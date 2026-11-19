@@ -5,6 +5,7 @@ import {
   generateEventNews,
   generateNews,
   generateSourcePoint,
+  mergeEvents,
   scoreItems,
   type NewsAiClient,
 } from "./news-ai";
@@ -400,5 +401,32 @@ describe("generateSourcePoint", () => {
     ]) {
       expect(await generateSourcePoint(input, fakeClient(impl).client)).toEqual({ ok: false });
     }
+  });
+});
+
+describe("mergeEvents", () => {
+  const fake = (payload: unknown) => ({
+    messages: {
+      create: async () =>
+        ({ content: [{ type: "text", text: JSON.stringify(payload) }], stop_reason: "end_turn" }) as unknown as Anthropic.Message,
+    },
+  });
+  it("keeps valid merges, drops unknown keys and self-merges, resolves chains", async () => {
+    const r = await mergeEvents(
+      {
+        candidates: [
+          { eventKey: "a", titles: ["A"] },
+          { eventKey: "b", titles: ["B"] },
+          { eventKey: "c", titles: ["C"] },
+        ],
+        openEvents: [{ eventKey: "open", title: "Open" }],
+      },
+      fake({ merges: [{ from: "a", into: "b" }, { from: "b", into: "open" }, { from: "c", into: "c" }, { from: "x", into: "a" }] }),
+    );
+    expect(r).toEqual({ ok: true, merges: [{ from: "a", into: "open" }, { from: "b", into: "open" }] });
+  });
+  it("returns ok:false on malformed output", async () => {
+    const client = { messages: { create: async () => ({ content: [{ type: "text", text: "nope" }], stop_reason: "end_turn" }) as unknown as Anthropic.Message } };
+    expect(await mergeEvents({ candidates: [{ eventKey: "a", titles: [] }, { eventKey: "b", titles: [] }], openEvents: [] }, client)).toEqual({ ok: false });
   });
 });

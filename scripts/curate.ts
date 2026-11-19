@@ -89,6 +89,7 @@ async function prodDeps(): Promise<CurationDeps> {
     generateEvent: (input) => ai.generateEventNews(input),
     generateConcept: (input) => ai.generateConcept(input),
     generateSourcePoint: (input) => ai.generateSourcePoint(input),
+    mergeEvents: (input) => ai.mergeEvents(input),
   };
 }
 
