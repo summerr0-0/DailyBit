@@ -389,3 +389,17 @@ describe("Gemini diff review fixes", () => {
     expect(mem.drafts[0].warnings).not.toContain("number_not_in_source:999");
   });
 });
+
+describe("retention churn", () => {
+  it("does not store items older than the 30-day retention window, so purge and re-insert don't loop", async () => {
+    const feeds: FeedResult[] = [{ sourceId: "openai", items: [entry("ancient", hoursAgo(40 * 24)), entry("week", hoursAgo(7 * 24))] }];
+    const { deps, mem } = makeDeps({ feeds });
+    const first = await runCuration(deps);
+    expect(statusOf(mem, "ancient")).toBeUndefined();
+    expect(statusOf(mem, "week")).toMatchObject({ status: "SKIPPED", skipReason: "stale" });
+    const second = await runCuration(deps);
+    expect(first.skippedNew).toBe(1);
+    expect(second.skippedNew).toBe(0);
+    expect(second.purgedItems).toBe(0);
+  });
+});

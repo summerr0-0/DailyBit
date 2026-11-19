@@ -207,8 +207,12 @@ export async function runCuration(deps: CurationDeps): Promise<CurationSummary> 
   // 3. 신선도 (R3.1): 날짜 없음/오래됨은 즉시 SKIPPED로 기록
   const skipped: NewFeedItem[] = [];
   const fresh: FreshEntry[] = [];
+  // 보관 기간(30일)보다 오래된 기사는 기록하지 않는다 — 기록하면 정리 단계가 지우고 다음 실행에서 다시 넣는
+  // 삭제·재삽입이 매번 반복된다(첫 운영에서 실행당 ~1,450행). 기록하지 않아도 매번 신선도에서 걸러진다.
+  const retentionCutoff = new Date(now.getTime() - FEED_ITEM_RETENTION_MS);
   for (const e of unseen) {
     if (!e.publishedAt) skipped.push(toNewItem(e, "SKIPPED", null, "no_date"));
+    else if (e.publishedAt < retentionCutoff) continue;
     else if (e.publishedAt < freshCutoff) skipped.push(toNewItem(e, "SKIPPED", null, "stale"));
     else fresh.push(e);
   }
