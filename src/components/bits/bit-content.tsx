@@ -33,6 +33,22 @@ function renderTags(text: string, offset: number): ReactNode[] {
 }
 
 // URL 구간을 먼저 떼어낸 뒤 나머지 텍스트에서만 #태그를 링크로 만든다 (spec D13).
+// **굵게** — 줄을 넘지 않는 짝지어진 ** 사이만 (사용자 요청 2026-11-20)
+const BOLD_PATTERN = /\*\*([^\n]+?)\*\*/g;
+
+function renderBoldAndTags(text: string, offset: number): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let last = 0;
+  for (const m of text.matchAll(BOLD_PATTERN)) {
+    const start = m.index ?? 0;
+    if (start > last) nodes.push(...renderTags(text.slice(last, start), offset + last));
+    nodes.push(<strong key={`b${offset + start}`}>{renderTags(m[1], offset + start + 2)}</strong>);
+    last = start + m[0].length;
+  }
+  if (last < text.length) nodes.push(...renderTags(text.slice(last), offset + last));
+  return nodes;
+}
+
 export function renderBitContent(content: string): ReactNode[] {
   return splitByUrls(content).flatMap<ReactNode>((segment) =>
     segment.type === "url"
@@ -47,7 +63,7 @@ export function renderBitContent(content: string): ReactNode[] {
             {segment.value}
           </a>,
         ]
-      : renderTags(segment.value, segment.start),
+      : renderBoldAndTags(segment.value, segment.start),
   );
 }
 

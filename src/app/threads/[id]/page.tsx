@@ -2,13 +2,14 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getThread } from "@/lib/threads";
 import { getTagCloud } from "@/lib/bits";
-import { renderBitContent } from "@/components/bits/bit-content";
+import { isLoggedIn } from "@/lib/auth";
+import { EditableBitContent, ThreadTitle } from "@/components/threads/ThreadEditors";
 
 type Props = { params: Promise<{ id: string }> };
 
 export default async function ThreadPage({ params }: Props) {
   const { id } = await params;
-  const [thread, tagCloud] = await Promise.all([getThread(id), getTagCloud()]);
+  const [thread, tagCloud, owner] = await Promise.all([getThread(id), getTagCloud(), isLoggedIn()]);
 
   if (!thread) notFound();
 
@@ -55,17 +56,7 @@ export default async function ThreadPage({ params }: Props) {
               padding: "20px 24px",
               marginBottom: "16px",
             }}>
-              <h1 style={{
-                fontFamily: "var(--font-newsreader), serif",
-                fontSize: "22px",
-                fontWeight: 500,
-                color: "#2A2620",
-                margin: 0,
-                letterSpacing: "-0.3px",
-                lineHeight: 1.3,
-              }}>
-                {thread.title}
-              </h1>
+              <ThreadTitle threadId={thread.id} title={thread.title} editable={owner} />
               <p style={{ fontSize: "13px", color: "#A89E89", marginTop: "6px" }}>
                 {thread.bits.length} {thread.bits.length === 1 ? "step" : "steps"}
               </p>
@@ -123,9 +114,7 @@ export default async function ThreadPage({ params }: Props) {
                         day: "numeric",
                       })}
                     </p>
-                    <p style={{ fontSize: "15px", lineHeight: 1.68, color: "#33302A", whiteSpace: "pre-wrap", margin: 0 }}>
-                      {renderBitContent(bit.content)}
-                    </p>
+                    <EditableBitContent bitId={bit.id} content={bit.content} editable={owner} />
                     {bit.tags.length > 0 && (
                       <div style={{ marginTop: "10px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
                         {bit.tags.map((tag) => (

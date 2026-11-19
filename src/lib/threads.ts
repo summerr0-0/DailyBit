@@ -87,3 +87,11 @@ export async function getThread(id: string): Promise<ThreadWithBits | null> {
 
   return row;
 }
+
+/** Thread 제목 수정 (오너). 대상이 없으면 false. */
+export async function updateThreadTitle(id: string, title: string): Promise<boolean> {
+  const t = title.trim();
+  if (t.length === 0 || t.length > 100) throw new Error("invalid_title");
+  const { count } = await prisma.thread.updateMany({ where: { id }, data: { title: t } });
+  return count > 0;
+}

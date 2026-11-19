@@ -127,3 +127,22 @@ describe("BitCard", () => {
     });
   });
 });
+
+describe("bold formatting", () => {
+  it("renders **text** as <strong> and keeps tags and links working", async () => {
+    const { renderBitContent } = await import("./bit-content");
+    const { render } = await import("@testing-library/react");
+    const { container } = render(<p>{renderBitContent("see **important #ai note** at https://a.com/x.")}</p>);
+    const strong = container.querySelector("strong");
+    expect(strong?.textContent).toBe("important #ai note");
+    expect(strong?.querySelector("a")?.getAttribute("href")).toBe("/tags/ai");
+    expect(container.querySelector('a[href="https://a.com/x"]')).not.toBeNull();
+  });
+  it("leaves unmatched ** as text", async () => {
+    const { renderBitContent } = await import("./bit-content");
+    const { render } = await import("@testing-library/react");
+    const { container } = render(<p>{renderBitContent("2 ** 3 is power")}</p>);
+    expect(container.querySelector("strong")).toBeNull();
+    expect(container.textContent).toBe("2 ** 3 is power");
+  });
+});

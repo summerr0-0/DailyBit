@@ -29,7 +29,7 @@ export type BitWithAuthor = {
   aiCollab: AiCollabLevel;
   pinned: boolean;
   private: boolean;
-  thread: { id: string; title: string } | null;
+  thread: { id: string; title: string; bitCount?: number } | null;
   createdAtLabel: string;
   likeCount: number;
   rebitCount: number;
@@ -60,15 +60,16 @@ type BitRow = {
   aiCollab: AiCollabLevel;
   pinned: boolean;
   private: boolean;
-  thread: { id: string; title: string } | null;
+  thread: { id: string; title: string; _count: { bits: number } } | null;
   createdAt: Date;
   author: { id: string; nickname: string; image: string | null };
   _count: { likes: number; rebits: number; comments: number };
 };
 
-function toBitWithAuthor({ createdAt, _count, ...rest }: BitRow): BitWithAuthor {
+function toBitWithAuthor({ createdAt, _count, thread, ...rest }: BitRow): BitWithAuthor {
   return {
     ...rest,
+    thread: thread ? { id: thread.id, title: thread.title, bitCount: thread._count.bits } : null,
     createdAtLabel: toRelativeLabel(createdAt),
     likeCount: _count.likes,
     rebitCount: _count.rebits,
@@ -85,9 +86,27 @@ const BIT_SELECT = {
   private: true,
   createdAt: true,
   author: { select: { id: true, nickname: true, image: true } },
-  thread: { select: { id: true, title: true } },
+  // 공개 Bit 수만 센다 — 비공개 Bit의 존재가 방문자에게 드러나지 않게 (Gemini #1)
+  thread: { select: { id: true, title: true, _count: { select: { bits: { where: { private: false } } } } } },
   _count: { select: { likes: true, rebits: true, comments: true } },
 } as const;
+
+/**
+ * 홈 피드에서 Thread는 첫 Bit만 보인다 — 나머지는 Thread 페이지에서 본다 (사용자 요청 2026-11-20).
+ * 보이는 행(비공개 필터·태그 필터 적용 후) 중 Thread별 가장 이른 Bit만 남긴다. 단독 Bit는 그대로.
+ */
+export function keepThreadHeads<T extends { id: string; createdAt: Date; thread: { id: string } | null }>(rows: T[]): T[] {
+  const head = new Map<string, T>();
+  for (const r of rows) {
+    if (!r.thread) continue;
+    const cur = head.get(r.thread.id);
+    // 같은 시각이면 id로 결정 — 매번 같은 결과 (Gemini #2)
+    if (!cur || r.createdAt < cur.createdAt || (r.createdAt.getTime() === cur.createdAt.getTime() && r.id < cur.id)) {
+      head.set(r.thread.id, r);
+    }
+  }
+  return rows.filter((r) => !r.thread || head.get(r.thread.id)?.id === r.id);
+}
 
 export async function getBits(includePrivate = false): Promise<BitWithAuthor[]> {
   const rows = await prisma.bit.findMany({
@@ -127,7 +146,27 @@ export async function getBitsFiltered(filterTags: string[], includePrivate = fal
       orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
       select: BIT_SELECT,
     });
-    return rows.map((r) => ({ kind: "bit" as const, bit: toBitWithAuthor(r) }));
+    // 태그가 Thread 중간 Bit에만 있어도 피드에는 그 Thread의 첫 Bit를 보여준다 (Gemini #2)
+    const threadIds = [...new Set(rows.filter((r) => r.thread).map((r) => r.thread!.id))];
+    const heads =
+      threadIds.length > 0
+        ? keepThreadHeads(
+            await prisma.bit.findMany({
+              where: { threadId: { in: threadIds }, ...privacyFilter },
+              select: BIT_SELECT,
+            }),
+          )
+        : [];
+    const headByThread = new Map(heads.map((h) => [h.thread!.id, h]));
+    const seen = new Set<string>();
+    const out: typeof rows = [];
+    for (const r of rows) {
+      const shown = r.thread ? headByThread.get(r.thread.id) ?? r : r;
+      if (seen.has(shown.id)) continue;
+      seen.add(shown.id);
+      out.push(shown);
+    }
+    return out.map((r) => ({ kind: "bit" as const, bit: toBitWithAuthor(r) }));
   }
 
   const author = await ensureDevUser();
@@ -157,11 +196,12 @@ export async function getBitsFiltered(filterTags: string[], includePrivate = fal
     | { kind: "bit"; sortAt: Date; row: (typeof bitRows)[0] }
     | { kind: "rebit"; sortAt: Date; rebitId: string; message: string | null; row: (typeof rebitRows)[0]["bit"] };
 
-  const pinned: FeedItem[] = bitRows
+  const headRows = keepThreadHeads(bitRows);
+  const pinned: FeedItem[] = headRows
     .filter((r) => r.pinned)
     .map((r) => ({ kind: "bit", bit: toBitWithAuthor(r) }));
 
-  const unpinnedBitEntries: RawFeedEntry[] = bitRows
+  const unpinnedBitEntries: RawFeedEntry[] = headRows
     .filter((r) => !r.pinned)
     .map((r) => ({ kind: "bit", sortAt: r.createdAt, row: r }));
 
@@ -305,4 +345,14 @@ export async function toggleBitPin(id: string): Promise<boolean> {
 export async function deleteBit(id: string): Promise<boolean> {
   const { count } = await prisma.bit.deleteMany({ where: { id } });
   return count > 0;
+}
+
+export const BIT_MAX_LENGTH = 500;
+
+/** Bit 본문 수정 (오너). 태그는 본문에서 다시 뽑는다. 대상이 없으면 null. */
+export async function updateBitContent(id: string, content: string): Promise<{ id: string } | null> {
+  const trimmed = content.trim();
+  if (trimmed.length === 0 || trimmed.length > BIT_MAX_LENGTH) throw new Error("invalid_length");
+  const { count } = await prisma.bit.updateMany({ where: { id }, data: { content: trimmed, tags: parseTags(trimmed) } });
+  return count > 0 ? { id } : null;
 }

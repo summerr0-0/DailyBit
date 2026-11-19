@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
+import { FormatToolbar, handleBoldShortcut } from "./FormatToolbar";
 const MAX_LENGTH = 500;
 const WARN_THRESHOLD = MAX_LENGTH - 50;
 
 export function BitComposer() {
   const router = useRouter();
   const [content, setContent] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isPrivate, setIsPrivate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +46,7 @@ export function BitComposer() {
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (handleBoldShortcut(e, textareaRef, content, setContent)) return;
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       void submit();
@@ -68,14 +71,17 @@ export function BitComposer() {
       }}
     >
       <div className="space-y-2">
+          <FormatToolbar textareaRef={textareaRef} value={content} onChange={setContent} />
           <textarea
+            ref={textareaRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="What are you learning today? Try #tags too"
-            rows={3}
+            placeholder="What are you learning today? Try #tags and **bold**"
+            rows={6}
             aria-label="Bit content"
-            className="w-full resize-none bg-transparent text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
+            className="w-full resize-y bg-transparent text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
+            style={{ minHeight: 120 }}
           />
 
           {/* Counter + controls + submit */}
