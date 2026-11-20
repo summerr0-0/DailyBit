@@ -588,7 +588,8 @@ export async function runCuration(deps: CurationDeps): Promise<CurationSummary> 
           term: c.term,
           definition: cg.output.definition,
           whyItMatters: cg.output.whyItMatters,
-          tags: cleanTags([], sourceById.get(lead.sourceId)?.tag ?? sourceById.get(lead.sourceId)?.category ?? "ai"),
+          // 뉴스 요약과 같은 규칙의 첫 태그 — 대표 태그가 목록 밖이어도 모델 태그로 채운다 (Gemini tag-fix #2)
+          tags: cleanTags(gen.output.tags ?? [], sourceById.get(lead.sourceId)?.tag ?? sourceById.get(lead.sourceId)?.category ?? "ai").slice(0, 1),
         });
         try {
           await store.createConceptDraft({

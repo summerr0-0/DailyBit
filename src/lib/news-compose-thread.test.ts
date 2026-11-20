@@ -199,6 +199,9 @@ describe("buildConceptThread (D6)", () => {
     const long = buildConceptThread({ term: "x", definition: words(150, "def"), whyItMatters: "w", tags: ["security"] });
     expect(long.segments[0].length).toBeLessThanOrEqual(NEWS_BIT_MAX_CHARS);
     expect(long.segments[0].endsWith("\n\n#security")).toBe(true);
+    const longTerm = buildConceptThread({ term: words(120, "term"), definition: "Def here.", whyItMatters: "w", tags: ["security"] });
+    expect(longTerm.segments[0]).toContain("Def here.");
+    expect(buildConceptThread({ term: "x", definition: "d", whyItMatters: "w", tags: ["", "#bad", "ok"] }).segments[0]).toBe("What is x?\nd\n\n#ok");
   });
   it("URL 제거, 각 Bit ≤500, 제목 ≤100", () => {
     const r = buildConceptThread({

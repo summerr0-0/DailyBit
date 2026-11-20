@@ -253,9 +253,15 @@ export function buildConceptThread(input: { term: string; definition: string; wh
 } {
   const term = stripUrls(input.term).text;
   const title = `What is ${term}?`;
-  const tagLine = (input.tags ?? []).map((t) => `#${t}`).join(" ");
+  // 이미 정제된 태그만 (빈 값·# 포함 값 무시), 최대 3개 (Gemini tag-fix #3)
+  const tagLine = (input.tags ?? [])
+    .filter((t) => /^[\p{L}\p{N}_]{1,40}$/u.test(t))
+    .slice(0, NEWS_MAX_TAGS)
+    .map((t) => `#${t}`)
+    .join(" ");
   const suffix = tagLine ? `\n\n${tagLine}` : "";
-  const head = truncateAtWord(title, NEWS_BIT_MAX_CHARS - 1 - suffix.length);
+  // 제목 줄은 Thread 제목 길이로 묶어 정의 자리를 남긴다 (Gemini tag-fix #1)
+  const head = truncateAtWord(title, THREAD_TITLE_MAX_CHARS);
   const body = stripUrls(input.definition).text;
   const room = NEWS_BIT_MAX_CHARS - head.length - 1 - suffix.length;
   const first = `${head}\n${truncateAtWord(body, Math.max(0, room))}${suffix}`;
