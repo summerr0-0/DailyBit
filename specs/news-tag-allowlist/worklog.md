@@ -12,3 +12,10 @@
 
 ## 기존 공개 뉴스 재태깅 (retag-2026-11-20.json에 이전 값)
 보안 뉴스 8개 → #security, OpenAI 1개 → #ai #llm.
+
+## Gemini diff review (gemini-diff-review.md) — 전부 반영
+- #1 대표 태그도 별칭·허용 목록 검사 (목록 밖 category가 그대로 새지 않게)
+- #2 프롬프트 1~3개로 (대표 태그와 겹쳐도 보조 태그가 남게)
+- #3 `_`도 제거해 비교 (spring_boot → springboot → spring)
+- #4 프롬프트 태그 목록을 NEWS_TAGS에서 생성
+- #5 #1로 해소 (빈 대표 태그는 목록 검사에서 빠짐)

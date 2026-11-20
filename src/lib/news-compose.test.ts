@@ -101,6 +101,13 @@ describe("태그 정제 (R6.2b + 허용 목록 2026-11-20)", () => {
     expect(cleanTags(["openai", "GPT", "node.js"], "ai")).toEqual(["ai", "llm", "nodejs"]);
     expect(cleanTags(["Spring-Boot", "#Java"], "security")).toEqual(["security", "spring", "java"]);
     expect(cleanTags(["constructor", "__proto__"], "ai")).toEqual(["ai"]);
+    expect(cleanTags(["spring_boot", "zero_day"], "java")).toEqual(["java", "spring", "security"]);
+  });
+
+  it("대표 태그도 별칭·목록 검사 — 목록 밖 category는 새지 않는다 (Gemini tag #1)", () => {
+    expect(cleanTags(["spring"], "dev")).toEqual(["spring"]);
+    expect(cleanTags(["nodejs"], "node")).toEqual(["nodejs"]);
+    expect(cleanTags(["php"], "")).toEqual([]);
   });
 
   it("개발 소스는 소스 대표 태그를 쓴다", () => {

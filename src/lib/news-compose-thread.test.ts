@@ -68,9 +68,11 @@ describe("buildNewsThread — 조립 (R3.1)", () => {
     expect(r.warnings).toContain("llm_url_removed");
   });
 
-  it("태그가 비면 첫 출처 category로 대체", () => {
-    const r = buildNewsThread({ ...output, tags: [] }, [srcB, srcA]);
-    expect(r.ok && r.segments[0].endsWith("\n\n#tech")).toBe(true);
+  it("태그가 비면 첫 출처 대표 태그로 대체 — 목록 밖 category면 태그 줄 없음", () => {
+    const r = buildNewsThread({ ...output, tags: [] }, [srcA, srcB]);
+    expect(r.ok && r.segments[0].endsWith("\n\n#ai")).toBe(true);
+    const off = buildNewsThread({ ...output, tags: [] }, [srcB, srcA]);
+    expect(off.ok && off.segments[0].includes("#")).toBe(false);
   });
 
   it("포인트 없는 출처는 이름만", () => {

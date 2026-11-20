@@ -37,18 +37,14 @@ export function stripUrls(text: string): { text: string; removed: boolean } {
  * 대표 태그(primary: 소스 tag 또는 category)를 맨 앞에 두고, 나머지는 NEWS_TAGS(별칭 포함) 안의 것만, 중복 없이 최대 3개.
  */
 export function cleanTags(tags: readonly string[], primary: string): string[] {
-  const norm = (raw: string) =>
-    raw
-      .toLowerCase()
-      .replace(/^#+/u, "")
-      .replace(/[\s-]+/gu, "")
-      .replace(/[^\p{L}\p{N}_]/gu, "");
+  // 글자·숫자만 남긴다 (spring_boot·spring-boot·Spring Boot → springboot), 별칭이면 목록 태그로 (Gemini tag #3)
+  const resolve = (raw: string) => {
+    const t = raw.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+    return Object.prototype.hasOwnProperty.call(NEWS_TAG_ALIASES, t) ? NEWS_TAG_ALIASES[t] : t;
+  };
   const out: string[] = [];
-  const head = norm(primary);
-  if (head) out.push(head);
-  for (const raw of tags) {
-    const t = norm(raw);
-    const tag = Object.prototype.hasOwnProperty.call(NEWS_TAG_ALIASES, t) ? NEWS_TAG_ALIASES[t] : t;
+  // 대표 태그도 별칭·목록 검사를 거친다 — "dev" 같은 category가 그대로 새지 않게 (Gemini tag #1)
+  for (const tag of [resolve(primary), ...tags.map(resolve)]) {
     if (tag && NEWS_TAGS.includes(tag) && !out.includes(tag)) out.push(tag);
     if (out.length >= NEWS_MAX_TAGS) break;
   }
