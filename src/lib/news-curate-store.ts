@@ -85,6 +85,19 @@ export const prismaCurationStore: CurationStore = {
     return { draftId: draft.id, updatedAt: draft.updatedAt, sourceCount };
   },
 
+  async countEventsWithSourcesSince(since, sourceIds) {
+    if (sourceIds.length === 0) return 0;
+    // 24시간 안에 생긴 사건(소수)을 먼저 찾고, 그중 개발 출처 기사가 DRAFTED인 사건만 센다 (Gemini dev #5)
+    const recent = await prisma.newsEvent.findMany({ where: { createdAt: { gte: since } }, select: { eventKey: true } });
+    if (recent.length === 0) return 0;
+    const rows = await prisma.feedItem.findMany({
+      where: { eventKey: { in: recent.map((e) => e.eventKey) }, sourceId: { in: sourceIds }, status: "DRAFTED" },
+      select: { eventKey: true },
+      distinct: ["eventKey"],
+    });
+    return rows.length;
+  },
+
   async createEventDraft(input) {
     await createEventDraft(input);
   },

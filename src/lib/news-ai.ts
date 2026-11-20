@@ -63,12 +63,13 @@ async function callJson(
 
 // ---------- 채점 + 사건 묶기 (v1 D7, v2 D1·R1.1) ----------
 
-const SCORE_SYSTEM_PROMPT = `You rate news candidates for an English dev-news feed read by AI and security practitioners.
+const SCORE_SYSTEM_PROMPT = `You rate news candidates for an English dev-news feed read by AI and security practitioners and by Java/Spring and React/Next.js/Node.js web developers.
 
 Score each item from 0 to 10 for how much it tells a practitioner a NEW FACT worth knowing today.
 - High (7-10): new releases or model/product launches, disclosed vulnerabilities or active exploits, breaches, published research results, notable benchmarks or measured findings, significant policy or standards decisions.
 - Middle (4-6): incremental updates, tutorials or analysis with some new information.
 - Low (0-3): opinion pieces, marketing or promotional posts, hiring or job posts, events, webinars, conference announcements, podcasts, roundups without new facts.
+- For framework and runtime blogs (JDK/Java, Spring, React, Next.js, Node.js): stable major or minor releases, security releases, and new language/JDK features targeted to a release are High; routine patch releases with only bug fixes are 4-5 (below the cut); alpha, beta, nightly, release-candidate or milestone builds and weekly link roundups are Low.
 
 Also assign each item an "event": a short descriptive key for the real-world event it reports (lowercase kebab-case, e.g. "openai-gpt-6-2-release", at most 60 characters).
 - Items reporting the same real-world event (same release, same vulnerability, same incident) must share one event key, even if from different sources.

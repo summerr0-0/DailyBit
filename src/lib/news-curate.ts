@@ -36,7 +36,10 @@ export const FEED_ITEM_RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // v1 D5
 export const KNOWN_EVENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // v2 D1
 export const MIN_SCORE = 6; // v1 D7
 export const MAX_SCORED_PER_RUN = 60; // v1 D7
-export const MAX_EVENTS_PER_RUN = 3; // v2 D2 (사건 작성 시도 수)
+export const MAX_EVENTS_PER_RUN = 3; // v2 D2 (사건 작성 시도 수) — AI·보안
+/** 개발(Java·Spring·React·Next.js·Node.js) 사건은 AI·보안과 따로, 최근 24시간 기준 최대 5개 (2026-11-20 요청) */
+export const MAX_DEV_EVENTS_PER_DAY = 5;
+export const DEV_EVENT_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const MAX_SOURCES_PER_EVENT = 3; // v2 D2
 export const MAX_LATE_SOURCES_PER_RUN = 3; // v2 D8
 export const MAX_CONCEPT_DRAFTS_PER_RUN = 2; // v2 D6
@@ -98,6 +101,8 @@ export interface CurationStore {
   findEventStatus(eventKey: string): Promise<EventStatus | null>;
   /** OPEN 사건의 초안 정보 — 출처 수는 FeedItem(DRAFTED, eventKey) 기준 (D14-4). */
   findOpenEventDraft(eventKey: string): Promise<OpenEventDraft | null>;
+  /** since 이후 만들어진 사건 중 sourceIds 출처의 기사(DRAFTED)를 하나라도 가진 사건 수 — 개발 뉴스 일일 상한용. */
+  countEventsWithSourcesSince(since: Date, sourceIds: string[]): Promise<number>;
   /** 한 트랜잭션: NewsEvent + ScrapDraft + FeedItem DRAFTED. 같은 키가 있으면 EventKeyConflictError. */
   createEventDraft(input: {
     eventKey: string;
@@ -157,6 +162,8 @@ export type CurationSummary = {
   staled: number;
   lateSourcesAdded: number;
   eventsAttempted: number;
+  /** 그중 개발 카테고리 사건 */
+  devEventsAttempted: number;
   drafted: number;
   failed: number;
   skippedSelected: number;
@@ -255,6 +262,7 @@ export async function runCuration(deps: CurationDeps): Promise<CurationSummary> 
     staled: 0,
     lateSourcesAdded: 0,
     eventsAttempted: 0,
+    devEventsAttempted: 0,
     drafted: 0,
     failed: 0,
     skippedSelected: 0,
@@ -449,11 +457,27 @@ export async function runCuration(deps: CurationDeps): Promise<CurationSummary> 
     }
   }
 
-  // 6. 새 사건 작성 (v2 D2~D7): 사건 작성 시도 3회까지. 본문 부족으로 모델을 안 부른 사건은 슬롯을 쓰지 않는다.
+  // 6. 새 사건 작성 (v2 D2~D7): AI·보안은 실행당 3회, 개발은 최근 24시간 5개까지 — 슬롯을 따로 쓴다.
+  // 본문 부족으로 모델을 안 부른 사건은 슬롯을 쓰지 않는다. 상한에 밀린 사건은 CANDIDATE로 남아 다음 실행에서 다시 경쟁한다.
   let concepts = await store.findConcepts();
   let conceptDraftsThisRun = 0;
+  const devSourceIds = deps.sources.filter((s) => s.category === "dev").map((s) => s.id);
+  const isDevItem = (i: FeedItemRow) => sourceById.get(i.sourceId)?.category === "dev";
+  const devBudget =
+    devSourceIds.length === 0
+      ? 0
+      : Math.max(
+          0,
+          MAX_DEV_EVENTS_PER_DAY -
+            (await store.countEventsWithSourcesSince(new Date(now.getTime() - DEV_EVENT_WINDOW_MS), devSourceIds)),
+        );
+  let generalAttempted = 0;
   for (const group of newEventGroups) {
-    if (summary.eventsAttempted >= MAX_EVENTS_PER_RUN) break;
+    const generalFull = generalAttempted >= MAX_EVENTS_PER_RUN;
+    const devFull = summary.devEventsAttempted >= devBudget;
+    if (generalFull && devFull) break;
+    // 개발 출처가 하나도 없으면 개발 슬롯을 쓸 수 없다 — 본문 추출 전에 거른다
+    if (generalFull && !group.items.some(isDevItem)) continue;
 
     // 7일 목록 밖의 오래된 사건과 키가 같으면 모델을 부르기 전에 정리한다 (Gemini diff #3, D14-7)
     const priorStatus = await store.findEventStatus(group.eventKey);
@@ -474,9 +498,14 @@ export async function runCuration(deps: CurationDeps): Promise<CurationSummary> 
       }
     }
     if (withContent.length === 0) continue;
+    // 개발 사건 판정은 실제로 초안에 들어갈 출처 기준 — 저장소 집계(DRAFTED 개발 출처)와 일치시킨다 (Gemini dev #1)
+    const dev = withContent.some((w) => isDevItem(w.item));
+    if (dev ? devFull : generalFull) continue; // 남은 출처는 CANDIDATE로 다음 실행
 
     summary.eventsAttempted++;
     summary.selected++;
+    if (dev) summary.devEventsAttempted++;
+    else generalAttempted++;
     const items = withContent.map((w) => w.item);
     const lead = items[0];
     let draftedThisEvent = false;
@@ -580,7 +609,7 @@ export async function runCuration(deps: CurationDeps): Promise<CurationSummary> 
   log(
     `curation: feeds ok=${summary.feedsOk} failed=${summary.feedsFailed} | new=${summary.newItems} skipped=${summary.skippedNew} ` +
       `scored=${summary.scored} candidates=${summary.newCandidates} staled=${summary.staled} | late_sources=${summary.lateSourcesAdded} ` +
-      `events=${summary.eventsAttempted} drafted=${summary.drafted} failed=${summary.failed} no_content=${summary.skippedSelected} ` +
+      `events=${summary.eventsAttempted} (dev=${summary.devEventsAttempted}/${devBudget}) drafted=${summary.drafted} failed=${summary.failed} no_content=${summary.skippedSelected} ` +
       `concept_drafts=${summary.conceptDrafts} | expired_drafts=${summary.expiredDrafts} purged=${summary.purgedItems}`,
   );
   return summary;
@@ -680,7 +709,8 @@ async function recordFailure(
   }
 }
 
-type MemEvent = RecentEvent & { draftId: string | null; updatedAt: Date };
+/** createdAt 없음 = 이 store에서 방금 만든 사건 (개발 일일 상한 계산 시 "지금"으로 본다) */
+type MemEvent = RecentEvent & { draftId: string | null; updatedAt: Date; createdAt?: Date };
 type MemDraft = {
   id: string;
   kind: "NEWS" | "CONCEPT";
@@ -759,6 +789,13 @@ export function createMemoryStore(initial: FeedItemRow[] = [], seed: { events?: 
       if (!draft) return null;
       const sourceCount = [...items.values()].filter((i) => i.eventKey === eventKey && i.status === "DRAFTED").length;
       return { draftId: draft.id, updatedAt: draft.updatedAt, sourceCount };
+    },
+    async countEventsWithSourcesSince(since, sourceIds) {
+      const ids = new Set(sourceIds);
+      const keys = new Set(
+        [...items.values()].filter((i) => i.status === "DRAFTED" && i.eventKey && ids.has(i.sourceId)).map((i) => i.eventKey),
+      );
+      return [...events.values()].filter((e) => keys.has(e.eventKey) && (!e.createdAt || e.createdAt >= since)).length;
     },
     async createEventDraft(input) {
       if (events.has(input.eventKey)) {
