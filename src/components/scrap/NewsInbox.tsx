@@ -31,7 +31,7 @@ export function NewsInbox({
         News inbox <span style={{ fontWeight: 500, color: MUTED }}>({items.length})</span>
       </h2>
       <p style={{ fontSize: 12.5, color: MUTED, marginBottom: 12 }}>
-        Auto-collected AI and security news, one Thread per story. Unreviewed drafts are removed after 3 days.
+        Auto-collected AI, security and Java/Spring/React/Next.js/Node.js news, one Thread per story. Unreviewed drafts are removed after 3 days.
       </p>
       {items.length === 0 ? (
         <p style={{ fontSize: 13, color: MUTED, textAlign: "center", padding: "12px 0" }}>No news drafts right now.</p>

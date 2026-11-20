@@ -20,11 +20,11 @@ const NOW = new Date("2026-11-18T21:00:00Z");
 const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3600_000);
 const BODY = "Long enough article body with 1200 users affected. ".repeat(10);
 
-const SOURCES: NewsSource[] = ["openai", "krebs", "willison", "schneier", "deepmind"].map((id) => ({
+const SOURCES: NewsSource[] = ["openai", "krebs", "willison", "schneier", "deepmind", "spring", "nodejs"].map((id) => ({
   id,
   name: id.toUpperCase(),
   feedUrl: `https://${id}.example/feed`,
-  category: id === "krebs" || id === "schneier" ? "security" : "ai",
+  category: id === "krebs" || id === "schneier" ? "security" : id === "spring" || id === "nodejs" ? "dev" : "ai",
 }));
 
 function entry(slug: string, publishedAt: Date | null, summary = "short summary"): FeedEntry {
@@ -467,5 +467,101 @@ describe("event merge check (fix/event-grouping)", () => {
     deps.mergeEvents = async () => ({ ok: false as const });
     await runCuration(deps);
     expect(generateEvent).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("dev news budget (2026-11-20: Java/Spring/React/Node.js official blogs)", () => {
+  const scoreBy = (high: string[]) => (keys: string[]) =>
+    Object.fromEntries(keys.map((k) => {
+      const slug = k.split("/").pop()!;
+      return [k, [high.includes(slug) ? 9 : 7, `ev-${slug}`] as [number, string]];
+    }));
+
+  it("gives dev events their own slots on top of the 3 AI/security events", async () => {
+    const feeds: FeedResult[] = [
+      { sourceId: "openai", items: ["a1", "a2", "a3", "a4"].map((s, i) => entry(s, hoursAgo(i + 1))) },
+      { sourceId: "spring", items: [entry("d1", hoursAgo(1)), entry("d2", hoursAgo(2))] },
+    ];
+    const { deps, mem } = makeDeps({ feeds, scores: scoreBy(["a1", "a2", "a3", "a4"]) });
+    const summary = await runCuration(deps);
+
+    expect(summary.devEventsAttempted).toBe(2);
+    expect(summary.drafted).toBe(5);
+    expect(itemOf(mem, "a4")?.status).toBe("CANDIDATE"); // 밀린 AI 기사는 다음 실행으로
+    expect(itemOf(mem, "d1")?.status).toBe("DRAFTED");
+    expect(itemOf(mem, "d2")?.status).toBe("DRAFTED");
+  });
+
+  it("caps dev events at 5 per rolling 24h, counting earlier runs; extras stay CANDIDATE", async () => {
+    const initial = [
+      row({ id: "old1", sourceId: "spring", status: "DRAFTED", eventKey: "ev-old1" }),
+      row({ id: "old2", sourceId: "nodejs", status: "DRAFTED", eventKey: "ev-old2" }),
+      row({ id: "old3", sourceId: "spring", status: "DRAFTED", eventKey: "ev-old3" }),
+      row({ id: "old4", sourceId: "spring", status: "DRAFTED", eventKey: "ev-old4" }), // 24시간 밖
+    ];
+    const ev = (eventKey: string, createdAt: Date) => ({
+      eventKey,
+      title: eventKey,
+      status: "PUBLISHED" as const,
+      draftId: null,
+      updatedAt: createdAt,
+      createdAt,
+    });
+    const feeds: FeedResult[] = [
+      { sourceId: "nodejs", items: ["n1", "n2", "n3"].map((s, i) => entry(s, hoursAgo(i + 1))) },
+    ];
+    const { deps, mem } = makeDeps({
+      feeds,
+      initial,
+      seed: { events: [ev("ev-old1", hoursAgo(3)), ev("ev-old2", hoursAgo(10)), ev("ev-old3", hoursAgo(20)), ev("ev-old4", hoursAgo(30))] },
+    });
+    const summary = await runCuration(deps);
+
+    expect(summary.devEventsAttempted).toBe(2); // 5 - 최근 24시간 3개
+    expect([...mem.items.values()].filter((i) => ["n1", "n2", "n3"].some((s) => i.urlNormalized.endsWith(`/${s}`)) && i.status === "CANDIDATE")).toHaveLength(1);
+  });
+
+  it("counts an event with any dev source as dev, so it does not use an AI/security slot", async () => {
+    const feeds: FeedResult[] = [
+      { sourceId: "krebs", items: ["k1", "k2", "k3"].map((s, i) => entry(s, hoursAgo(i + 1))) },
+      { sourceId: "nodejs", items: [entry("n-sec", hoursAgo(1))] },
+      { sourceId: "schneier", items: [entry("s-sec", hoursAgo(1))] },
+    ];
+    const { deps, mem } = makeDeps({
+      feeds,
+      scores: (keys) =>
+        Object.fromEntries(keys.map((k) => {
+          const slug = k.split("/").pop()!;
+          return [k, slug.endsWith("-sec") ? [9, "node-security-release"] : [8, `ev-${slug}`]] as [string, [number, string]];
+        })),
+    });
+    const summary = await runCuration(deps);
+
+    expect(summary.devEventsAttempted).toBe(1);
+    expect(summary.drafted).toBe(4);
+    expect(mem.events.get("node-security-release")?.status).toBe("OPEN");
+    expect(itemOf(mem, "k3")?.status).toBe("DRAFTED");
+  });
+
+  it("classifies by the sources actually drafted: a dev source without content does not make it a dev event (Gemini dev #1)", async () => {
+    const feeds: FeedResult[] = [
+      { sourceId: "krebs", items: ["k1", "k2", "k3"].map((s, i) => entry(s, hoursAgo(i + 1))) },
+      { sourceId: "nodejs", items: [entry("n-thin", hoursAgo(1))] },
+      { sourceId: "schneier", items: [entry("s-mixed", hoursAgo(1))] },
+    ];
+    const { deps, mem } = makeDeps({
+      feeds,
+      extract: async (url) => (url.includes("/n-thin") ? { ok: false } : { ok: true, rawExtract: BODY }),
+      scores: (keys) =>
+        Object.fromEntries(keys.map((k) => {
+          const slug = k.split("/").pop()!;
+          return [k, slug === "n-thin" || slug === "s-mixed" ? [9, "mixed-event"] : [8, `ev-${slug}`]] as [string, [number, string]];
+        })),
+    });
+    const summary = await runCuration(deps);
+
+    expect(summary.devEventsAttempted).toBe(0);
+    expect(mem.events.get("mixed-event")?.status).toBe("OPEN"); // AI·보안 슬롯 1개 사용
+    expect(itemOf(mem, "k3")?.status).toBe("CANDIDATE");
   });
 });
