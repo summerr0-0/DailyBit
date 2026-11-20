@@ -3,6 +3,8 @@ import Link from "next/link";
 import { TAG_PATTERN } from "@/lib/tags";
 import { splitByUrls } from "@/lib/linkify";
 import { resolveLink, splitWikiLinks, type LinkTargets } from "@/lib/wiki-links";
+import { splitFences } from "@/lib/code-fence";
+import { CodeBlock, MermaidDiagram } from "./MermaidDiagram";
 
 // Bit 본문 렌더링 — http(s) URL은 새 탭 링크, 그 밖의 #태그는 태그 페이지 링크 (spec: news-curation D13).
 // 홈 피드(BitCard)와 Thread 페이지가 같이 쓴다.
@@ -121,9 +123,32 @@ const HEADING_SIZE = { 1: 22, 2: 19, 3: 17 } as const;
  * 줄 맨 앞 `# ` `## ` `### `는 제목 블록(D6) — p 안에 들어가므로 span(role=heading)으로 그린다.
  */
 export function renderBitContent(content: string, links?: LinkTargets): ReactNode[] {
+  // ``` 코드 블록(```mermaid 는 도표)을 먼저 떼어 내고, 나머지 글만 서식·링크로 해석한다
   const nodes: ReactNode[] = [];
   let offset = 0;
-  const lines = content.replace(/\r\n?/g, "\n").split("\n");
+  for (const seg of splitFences(content)) {
+    if (seg.type === "code") {
+      nodes.push(
+        seg.lang === "mermaid" ? (
+          <MermaidDiagram key={`m${offset}`} code={seg.code} />
+        ) : (
+          <CodeBlock key={`c${offset}`} code={seg.code} />
+        ),
+      );
+    } else {
+      // 블록 앞뒤의 줄바꿈 하나는 블록 자체가 줄을 차지하므로 뺀다
+      const text = seg.value.replace(/^\n/, "").replace(/\n$/, "");
+      if (text) nodes.push(...renderText(text, offset, links));
+    }
+    offset += seg.type === "code" ? seg.raw.length : seg.value.length;
+  }
+  return nodes;
+}
+
+function renderText(content: string, base: number, links?: LinkTargets): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let offset = base;
+  const lines = content.split("\n");
   const isHeading = (l: string | undefined) => l !== undefined && HEADING_PATTERN.test(l);
   lines.forEach((line, i) => {
     const h = HEADING_PATTERN.exec(line);

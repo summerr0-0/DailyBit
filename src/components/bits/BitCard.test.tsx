@@ -168,3 +168,27 @@ describe("strikethrough flanking rules", () => {
     expect([...b.querySelectorAll("del")].map((d) => d.textContent)).toEqual(["취소"]);
   });
 });
+
+describe("code blocks and mermaid", () => {
+  it("renders a mermaid block as a diagram slot with its source as fallback, not as tags or links", async () => {
+    const { renderBitContent } = await import("./bit-content");
+    const { render } = await import("@testing-library/react");
+    const { container } = render(
+      <p>{renderBitContent("Flow\n```mermaid\nflowchart LR\n  A[[RSS]] --> B\n  style A fill:#f9f\n```\nend #crawler", { rss: "t1" })}</p>,
+    );
+    const code = container.querySelector("code");
+    expect(code?.textContent).toContain("A[[RSS]] --> B");
+    expect(container.querySelectorAll("a[href='/tags/f9f']")).toHaveLength(0);
+    expect(container.querySelectorAll("a[href='/threads/t1']")).toHaveLength(0);
+    expect(container.querySelectorAll("a[href='/tags/crawler']")).toHaveLength(1);
+    expect(container.textContent).toMatch(/^Flow/);
+  });
+
+  it("renders other fenced code as a plain code block", async () => {
+    const { renderBitContent } = await import("./bit-content");
+    const { render } = await import("@testing-library/react");
+    const { container } = render(<p>{renderBitContent("```java\nint x = 1; // **not bold**\n```")}</p>);
+    expect(container.querySelector("code")?.textContent).toBe("int x = 1; // **not bold**");
+    expect(container.querySelector("strong")).toBeNull();
+  });
+});

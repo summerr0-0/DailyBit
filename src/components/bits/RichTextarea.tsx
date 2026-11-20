@@ -1,10 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
-import { insertWikiLink, toggleBold, toggleHeading, toggleStrike, wikiQueryAt, type Edit } from "./text-format";
+import {
+  MERMAID_TEMPLATE,
+  insertBlock,
+  insertWikiLink,
+  toggleBold,
+  toggleHeading,
+  toggleStrike,
+  wikiQueryAt,
+  type Edit,
+} from "./text-format";
 
 // Bit 입력창 공용 컴포넌트 (spec: wiki-links D3, D6 + 2026-11-20 굵게 요청).
-// 서식 버튼 B · H1 · H2 · H3, 단축키 ⌘/Ctrl+B, `[[` 입력 시 Thread·개념 제목 자동완성.
+// 서식 버튼 B · S · H1 · H2 · H3 · Diagram(Mermaid), 단축키 ⌘/Ctrl+B, `[[` 입력 시 Thread·개념 제목 자동완성.
 
 type Suggestion = { title: string; kind: "thread" | "concept" };
 
@@ -102,6 +111,7 @@ export function RichTextarea({ value, onChange, onKeyDown, rows = 6, placeholder
     apply(toggleStrike(value, el?.selectionStart ?? value.length, el?.selectionEnd ?? value.length));
   };
   const heading = (level: 1 | 2 | 3) => apply(toggleHeading(value, ref.current?.selectionStart ?? value.length, level));
+  const diagram = () => apply(insertBlock(value, ref.current?.selectionEnd ?? value.length, MERMAID_TEMPLATE));
   const bold = () => {
     const el = ref.current;
     apply(toggleBold(value, el?.selectionStart ?? value.length, el?.selectionEnd ?? value.length));
@@ -109,7 +119,7 @@ export function RichTextarea({ value, onChange, onKeyDown, rows = 6, placeholder
 
   return (
     <div style={{ position: "relative" }}>
-      <div style={{ display: "flex", gap: 4, marginBottom: 6 }} role="toolbar" aria-label="Formatting">
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }} role="toolbar" aria-label="Formatting">
         <ToolButton label="Bold" title="Bold (⌘/Ctrl+B) — **text**" onClick={bold} weight={800}>
           B
         </ToolButton>
@@ -124,6 +134,9 @@ export function RichTextarea({ value, onChange, onKeyDown, rows = 6, placeholder
         </ToolButton>
         <ToolButton label="Heading 3" title="Heading 3 — ### at line start" onClick={() => heading(3)}>
           H3
+        </ToolButton>
+        <ToolButton label="Diagram" title="Mermaid diagram — ```mermaid … ```" onClick={diagram}>
+          ◇ Diagram
         </ToolButton>
         <span style={{ fontSize: 11.5, color: "#B4AB97", alignSelf: "center", marginLeft: 6 }}>Type [[ to link a thread</span>
       </div>

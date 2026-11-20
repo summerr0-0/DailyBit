@@ -75,3 +75,20 @@ export function insertWikiLink(value: string, cursor: number, start: number, tit
   const pos = start + link.length;
   return { value: v, selectionStart: pos, selectionEnd: pos };
 }
+
+export const MERMAID_TEMPLATE = "```mermaid\nflowchart LR\n  A[Start] --> B[Next]\n```";
+
+/** 커서 자리에 블록(예: Mermaid 도표 틀)을 자기 줄로 넣고, 블록 안 첫 내용 줄을 선택한다 (사용자 요청 2026-11-20). */
+export function insertBlock(value: string, cursor: number, block: string): Edit {
+  const before = value.slice(0, cursor);
+  const after = value.slice(cursor);
+  const lead = before === "" || before.endsWith("\n") ? "" : "\n";
+  const trail = after === "" || after.startsWith("\n") ? "" : "\n";
+  const v = `${before}${lead}${block}${trail}${after}`;
+  const blockStart = before.length + lead.length;
+  const firstLineEnd = block.indexOf("\n");
+  const secondLineEnd = block.indexOf("\n", firstLineEnd + 1);
+  const selStart = blockStart + firstLineEnd + 1;
+  const selEnd = blockStart + (secondLineEnd === -1 ? block.length : secondLineEnd);
+  return { value: v, selectionStart: selStart, selectionEnd: selEnd };
+}
