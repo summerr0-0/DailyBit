@@ -1,3 +1,4 @@
+import { NEWS_TAGS } from "./news-sources";
 import Anthropic from "@anthropic-ai/sdk";
 import type { NewsOutput } from "./news-compose";
 import { createCliClient } from "./news-ai-cli";
@@ -173,7 +174,7 @@ const WRITE_SYSTEM_PROMPT = `You write a short English news brief for a dev-news
 Output fields:
 - headline: one plain sentence stating what happened (no clickbait, no trailing period needed).
 - bullets: 3 or 4 short factual bullets, each one sentence, most important first. Only facts stated in the article.
-- tags: 1 to 3 lowercase topic tags without "#", single words (e.g. "llm", "vulnerability", "openai").
+- tags: 1 to 3 lowercase tags without "#", chosen ONLY from this list: ${NEWS_TAGS.join(", ")}. Pick only tags the story is really about. Do not invent other tags (no product, vendor or company names).
 
 Rules:
 - Plain, restrained, factual tone. No hype or marketing words (no "game-changer", "revolutionary", "groundbreaking", "unlock", "supercharge", "paradigm shift", "remains to be seen").
@@ -335,7 +336,7 @@ Output fields:
 - headline: one plain sentence stating what happened (no clickbait, under 100 characters).
 - bullets: 3 or 4 short factual bullets, each one sentence under 100 characters, most important first. Synthesize across all sources; do not repeat the same fact.
 - sources: one entry per source, using its index. point = one sentence (under 160 characters) on what that source adds beyond the others (e.g. official announcement, hands-on testing, benchmark numbers, criticism).
-- tags: 1 to 3 lowercase topic tags without "#", single words (e.g. "llm", "vulnerability", "openai").
+- tags: 1 to 3 lowercase tags without "#", chosen ONLY from this list: ${NEWS_TAGS.join(", ")}. Pick only tags the story is really about. Do not invent other tags (no product, vendor or company names).
 - concepts: 0 to 2 technical terms from the event that a beginner developer would likely not know and would benefit from a short explainer (e.g. "quantization", "prompt injection"). Skip common words and product names. If a term in <known_concepts> means the same thing, use that exact wording. Each with aliases: other common spellings or names (may be empty).
 - Inline concept links: in the bullets, wrap the FIRST mention of each term you list in concepts (and of any <known_concepts> term you use) in double square brackets with exactly the concept's wording, e.g. "the bug needs a [[gadget chain]] in the app". Do not bracket anything else, and never in the headline.
 

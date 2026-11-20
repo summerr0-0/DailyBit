@@ -8,7 +8,7 @@ describe("buildNewsBit — 조립 (R6.1)", () => {
     const r = buildNewsBit({ headline: "OpenAI ships GPT-6", bullets: ["b1", "b2", "b3", "b4"], tags: ["ai", "openai"] }, meta);
     expect(r).toEqual({
       ok: true,
-      content: "OpenAI ships GPT-6\n- b1\n- b2\n- b3\n- b4\n\nhttps://openai.com/index/gpt-6\n#ai #openai",
+      content: "OpenAI ships GPT-6\n- b1\n- b2\n- b3\n- b4\n\nhttps://openai.com/index/gpt-6\n#ai",
       warnings: [],
     });
   });
@@ -31,7 +31,7 @@ describe("buildNewsBit — 조립 (R6.1)", () => {
 
   it("빈 불릿은 버린다", () => {
     const r = buildNewsBit({ headline: "H", bullets: ["a", "  ", "b"], tags: ["x"] }, meta);
-    expect(r.ok && r.content).toBe(`H\n- a\n- b\n\n${meta.url}\n#x`);
+    expect(r.ok && r.content).toBe(`H\n- a\n- b\n\n${meta.url}\n#ai`);
   });
 
   it("headline이 비면 실패한다", () => {
@@ -81,28 +81,38 @@ describe("LLM URL 제거 (R6.2)", () => {
   });
 });
 
-describe("태그 정제 (R6.2b)", () => {
-  it("스펙 예시: #ai #opensource #redteam", () => {
-    const r = buildNewsBit({ headline: "H", bullets: ["a", "b"], tags: ["#AI", "open-source", "red team", "ai", "llm", "x"] }, meta);
-    expect(r.ok && r.content.split("\n").at(-1)).toBe("#ai #opensource #redteam");
+describe("태그 정제 (R6.2b + 허용 목록 2026-11-20)", () => {
+  it("대표 태그가 먼저, 나머지는 허용 목록 안의 것만", () => {
+    const r = buildNewsBit({ headline: "H", bullets: ["a", "b"], tags: ["#AI", "open-source", "red team", "LLM", "x"] }, meta);
+    expect(r.ok && r.content.split("\n").at(-1)).toBe("#ai #llm");
   });
 
-  it("tags가 []이면 소스 category 태그 1개", () => {
+  it("tags가 []이면 대표(category) 태그 1개", () => {
     const r = buildNewsBit({ headline: "H", bullets: ["a", "b"], tags: [] }, { url: "u", category: "security" });
     expect(r.ok && r.content.split("\n").at(-1)).toBe("#security");
   });
 
-  it("허용 문자 외 제거, 정제 후 빈 값은 버린다", () => {
-    expect(cleanTags(["c++", "node.js", "###", "!!", "gpt_5", "한국어"], "ai")).toEqual(["c", "nodejs", "gpt_5"]);
-    expect(cleanTags(["한국어", "Ünïcode"], "ai")).toEqual(["한국어", "ünïcode"]);
+  it("내 분야 밖 태그는 버리고 대표 태그만 — PHP·하드웨어 보안 뉴스는 #security", () => {
+    expect(cleanTags(["php", "vulnerability", "hardware"], "security")).toEqual(["security"]);
+    expect(cleanTags(["kvm", "linux", "zeroday"], "security")).toEqual(["security"]);
   });
 
-  it("정제 후 모두 비면 category로 대체한다", () => {
-    expect(cleanTags(["#", "--", " "], "AI")).toEqual(["ai"]);
+  it("별칭을 목록 태그로 바꾸고, 표기 정제 후 비교한다", () => {
+    expect(cleanTags(["openai", "GPT", "node.js"], "ai")).toEqual(["ai", "llm", "nodejs"]);
+    expect(cleanTags(["Spring-Boot", "#Java"], "security")).toEqual(["security", "spring", "java"]);
+    expect(cleanTags(["constructor", "__proto__"], "ai")).toEqual(["ai"]);
+    expect(cleanTags(["spring_boot", "zero_day"], "java")).toEqual(["java", "spring", "security"]);
   });
 
-  it("여러 개의 앞 # 제거", () => {
-    expect(cleanTags(["##LLM"], "ai")).toEqual(["llm"]);
+  it("대표 태그도 별칭·목록 검사 — 목록 밖 category는 새지 않는다 (Gemini tag #1)", () => {
+    expect(cleanTags(["spring"], "dev")).toEqual(["spring"]);
+    expect(cleanTags(["nodejs"], "node")).toEqual(["nodejs"]);
+    expect(cleanTags(["php"], "")).toEqual([]);
+  });
+
+  it("개발 소스는 소스 대표 태그를 쓴다", () => {
+    expect(cleanTags([], "spring")).toEqual(["spring"]);
+    expect(cleanTags(["java", "spring"], "spring")).toEqual(["spring", "java"]);
   });
 });
 

@@ -1,3 +1,4 @@
+import { NEWS_TAGS, NEWS_TAG_ALIASES } from "./news-sources";
 import { linkKey } from "./wiki-links";
 // 뉴스 초안 조립·린트 (spec: news-curation D9 / R6.1~R6.5).
 // LLM의 구조화 출력 {headline, bullets, tags}를 코드가 단일 Bit 본문으로 조립한다.
@@ -31,21 +32,23 @@ export function stripUrls(text: string): { text: string; removed: boolean } {
   return { text: collapseSpaces(stripped), removed };
 }
 
-/** 태그 정제(D9): 소문자, 앞 # 제거, 공백·하이픈 제거, [\p{L}\p{N}_]만 유지, 빈 값·중복 제거, 최대 3개. 0개면 category 태그. */
-export function cleanTags(tags: readonly string[], category: string): string[] {
+/**
+ * 태그 정제(D9 + 2026-11-20 허용 목록): 소문자, 앞 # 제거, 공백·하이픈 제거, [\p{L}\p{N}_]만 유지.
+ * 대표 태그(primary: 소스 tag 또는 category)를 맨 앞에 두고, 나머지는 NEWS_TAGS(별칭 포함) 안의 것만, 중복 없이 최대 3개.
+ */
+export function cleanTags(tags: readonly string[], primary: string): string[] {
+  // 글자·숫자만 남긴다 (spring_boot·spring-boot·Spring Boot → springboot), 별칭이면 목록 태그로 (Gemini tag #3)
+  const resolve = (raw: string) => {
+    const t = raw.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+    return Object.prototype.hasOwnProperty.call(NEWS_TAG_ALIASES, t) ? NEWS_TAG_ALIASES[t] : t;
+  };
   const out: string[] = [];
-  for (const raw of tags) {
-    const tag = raw
-      .toLowerCase()
-      .replace(/^#+/u, "")
-      .replace(/[\s-]+/gu, "")
-      .replace(/[^\p{L}\p{N}_]/gu, "");
-    if (tag && !out.includes(tag)) out.push(tag);
+  // 대표 태그도 별칭·목록 검사를 거친다 — "dev" 같은 category가 그대로 새지 않게 (Gemini tag #1)
+  for (const tag of [resolve(primary), ...tags.map(resolve)]) {
+    if (tag && NEWS_TAGS.includes(tag) && !out.includes(tag)) out.push(tag);
     if (out.length >= NEWS_MAX_TAGS) break;
   }
-  if (out.length > 0) return out;
-  const fallback = category.toLowerCase().replace(/[^\p{L}\p{N}_]/gu, "");
-  return fallback ? [fallback] : [];
+  return out;
 }
 
 function assemble(headline: string, bullets: string[], url: string, tags: string[]): string {
@@ -153,7 +156,8 @@ export type NewsThreadOutput = {
   sources: { index: number; point: string }[];
   tags: string[];
 };
-export type NewsThreadSource = { name: string; url: string; category: string };
+/** tag: 소스 대표 태그(없으면 category) */
+export type NewsThreadSource = { name: string; url: string; category: string; tag?: string };
 
 export type BuildNewsThreadResult =
   | { ok: true; segments: string[]; threadTitle: string; warnings: string[] }
@@ -205,7 +209,7 @@ export function buildNewsThread(output: NewsThreadOutput, sources: readonly News
     if (b.text) bullets.push(b.text);
   }
 
-  const tags = cleanTags(output.tags ?? [], sources[0].category);
+  const tags = cleanTags(output.tags ?? [], sources[0].tag ?? sources[0].category);
   let summary = assembleSummary(headline, bullets, tags);
   while (summary.length > NEWS_BIT_MAX_CHARS && bullets.length > 0) {
     bullets.pop();

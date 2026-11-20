@@ -525,6 +525,7 @@ export async function runCuration(deps: CurationDeps): Promise<CurationSummary> 
           name: sourceName(i.sourceId),
           url: cleanUrl(i.url),
           category: sourceById.get(i.sourceId)?.category ?? "ai",
+          tag: sourceById.get(i.sourceId)?.tag,
         })),
       );
       if (!built.ok) {
