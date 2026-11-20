@@ -58,7 +58,8 @@ describe("NEWS_SOURCES (R2.1)", () => {
   it("D4의 11개 + 개발 공식 블로그 5개 소스를 {id, name, feedUrl, category}로 export한다", () => {
     expect(NEWS_SOURCES).toHaveLength(16);
     for (const s of NEWS_SOURCES) {
-      expect(Object.keys(s).sort()).toEqual(["category", "feedUrl", "id", "name"]);
+      expect(Object.keys(s).filter((k) => k !== "tag").sort()).toEqual(["category", "feedUrl", "id", "name"]);
+      if (s.category === "dev") expect(s.tag).toMatch(/^[a-z]+$/);
       expect(s.feedUrl).toMatch(/^https:\/\//);
       expect(["ai", "security", "dev"]).toContain(s.category);
     }

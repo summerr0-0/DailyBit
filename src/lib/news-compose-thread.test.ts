@@ -37,7 +37,7 @@ describe("buildNewsThread — 조립 (R3.1)", () => {
     expect(r).toEqual({
       ok: true,
       segments: [
-        "OpenAI ships GPT-6\n- b1\n- b2\n- b3\n- b4\n\n#ai #openai",
+        "OpenAI ships GPT-6\n- b1\n- b2\n- b3\n- b4\n\n#ai",
         `Source: OpenAI Blog — Official launch post\n${srcA.url}`,
         `Source: The Verge — Hands-on impressions\n${srcB.url}`,
       ],
