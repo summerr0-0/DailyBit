@@ -1,5 +1,7 @@
 // Obsidian식 [[링크]] 파싱 (spec: wiki-links D1, D2). 순수 함수 — 서버·클라이언트 공용.
 
+import { withoutFences } from "./code-fence";
+
 export type WikiToken = { type: "text"; value: string } | { type: "link"; target: string; label: string; raw: string };
 
 const WIKI_PATTERN = /\[\[([^\[\]\n|]{1,100})(?:\|([^\[\]\n]{1,100}))?\]\]/g;
@@ -25,7 +27,8 @@ export function splitWikiLinks(text: string): WikiToken[] {
 
 /** 본문이 가리키는 링크 대상 키 목록 (중복 제거) */
 export function extractLinkKeys(text: string): string[] {
-  return [...new Set(splitWikiLinks(text).flatMap((t) => (t.type === "link" ? [linkKey(t.target)] : [])))];
+  // ``` 코드 블록 안의 [[ ]] (Mermaid 서브루틴 모양 등)는 링크가 아니다
+  return [...new Set(splitWikiLinks(withoutFences(text)).flatMap((t) => (t.type === "link" ? [linkKey(t.target)] : [])))];
 }
 
 /** 링크 대상 사전: linkKey → threadId */

@@ -72,3 +72,14 @@ describe("toggleWrap with nested / multiple marks (Gemini strike review)", () =>
     expect(toggleStrike(v, 0, v.length).value).toBe("a b");
   });
 });
+
+describe("insertBlock (mermaid template)", () => {
+  it("puts the block on its own lines and selects the first content line", async () => {
+    const { insertBlock, MERMAID_TEMPLATE } = await import("./text-format");
+    const r = insertBlock("intro", 5, MERMAID_TEMPLATE);
+    expect(r.value).toBe("intro\n" + MERMAID_TEMPLATE);
+    expect(r.value.slice(r.selectionStart, r.selectionEnd)).toBe("flowchart LR");
+    const mid = insertBlock("ab", 1, "```x\ny\n```");
+    expect(mid.value).toBe("a\n```x\ny\n```\nb");
+  });
+});

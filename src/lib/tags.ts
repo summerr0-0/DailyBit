@@ -1,4 +1,5 @@
 import { splitByUrls } from "./linkify";
+import { withoutFences } from "./code-fence";
 
 // 본문 렌더(BitCard)와 태그 추출(parseTags)이 동일 규칙을 쓰도록 단일 출처로 공유한다.
 // g 플래그가 있어 lastIndex 부작용이 있으므로, 사용처에서 매번 새 RegExp를 만들거나 split/matchAll로 안전하게 쓴다.
@@ -17,7 +18,8 @@ const MAX_TAGS = 10;
 export function parseTags(content: string): string[] {
   const seen = new Set<string>();
 
-  for (const segment of splitByUrls(content)) {
+  // ``` 코드 블록 안의 # (예: Mermaid 색상 #f9f)은 태그가 아니다
+  for (const segment of splitByUrls(withoutFences(content))) {
     if (segment.type !== "text") continue;
     for (const match of segment.value.matchAll(TAG_PATTERN)) {
       const tag = match[1].toLowerCase();
