@@ -19,6 +19,7 @@ import {
   buildConceptThread,
   buildNewsThread,
   buildSourceBit,
+  cleanTags,
   checkNumbersMulti,
   findBannedPhrases,
   keepAllowedWikiLinks,
@@ -583,7 +584,12 @@ export async function runCuration(deps: CurationDeps): Promise<CurationSummary> 
           log(`concept ${c.slug} draft failed — stays PENDING without a draft`);
           continue;
         }
-        const ct = buildConceptThread({ term: c.term, definition: cg.output.definition, whyItMatters: cg.output.whyItMatters });
+        const ct = buildConceptThread({
+          term: c.term,
+          definition: cg.output.definition,
+          whyItMatters: cg.output.whyItMatters,
+          tags: cleanTags([], sourceById.get(lead.sourceId)?.tag ?? sourceById.get(lead.sourceId)?.category ?? "ai"),
+        });
         try {
           await store.createConceptDraft({
             slug: c.slug,

@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { getThreads } from "@/lib/threads";
 import { getTagCloud } from "@/lib/bits";
+import { isLoggedIn } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function ThreadsPage() {
-  const [threads, tagCloud] = await Promise.all([getThreads(), getTagCloud()]);
+  // 홈 사이드바와 같은 기준: 관리자면 비공개 글의 태그도 센다
+  const [threads, tagCloud] = await Promise.all([getThreads(), isLoggedIn().then((owner) => getTagCloud(owner))]);
 
   return (
     <div style={{ minHeight: "100vh", background: "#F4F0E7", padding: "32px 20px 80px" }}>

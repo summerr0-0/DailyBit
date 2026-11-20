@@ -193,6 +193,13 @@ describe("buildConceptThread (D6)", () => {
       threadTitle: "What is Quantization?",
     });
   });
+  it("뉴스 대표 태그를 첫 Bit 끝에 붙이고 500자를 지킨다", () => {
+    const r = buildConceptThread({ term: "use-after-free", definition: "Def.", whyItMatters: "Why.", tags: ["security"] });
+    expect(r.segments[0]).toBe("What is use-after-free?\nDef.\n\n#security");
+    const long = buildConceptThread({ term: "x", definition: words(150, "def"), whyItMatters: "w", tags: ["security"] });
+    expect(long.segments[0].length).toBeLessThanOrEqual(NEWS_BIT_MAX_CHARS);
+    expect(long.segments[0].endsWith("\n\n#security")).toBe(true);
+  });
   it("URL 제거, 각 Bit ≤500, 제목 ≤100", () => {
     const r = buildConceptThread({
       term: words(30, "term"),
