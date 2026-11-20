@@ -242,15 +242,29 @@ function withBody(prefixLine: string, body: string): string {
   return `${prefixLine}\n${truncateAtWord(body, Math.max(0, room))}`;
 }
 
-/** 개념 Thread 앞 Bit 2개(D6 ①②). ③ 관련 뉴스 Bit는 발행 시점에 draft-hooks의 relatedNewsBit로 붙인다. */
-export function buildConceptThread(input: { term: string; definition: string; whyItMatters: string }): {
+/**
+ * 개념 Thread 앞 Bit 2개(D6 ①②). ③ 관련 뉴스 Bit는 발행 시점에 draft-hooks의 relatedNewsBit로 붙인다.
+ * tags: 뉴스의 대표 태그 — 첫 Bit 끝에 붙인다 (2026-11-20: 개념 글이 태그 없이 올라가던 문제).
+ */
+export function buildConceptThread(input: { term: string; definition: string; whyItMatters: string; tags?: readonly string[] }): {
   ok: true;
   segments: [string, string];
   threadTitle: string;
 } {
   const term = stripUrls(input.term).text;
   const title = `What is ${term}?`;
-  const first = withBody(truncateAtWord(title, NEWS_BIT_MAX_CHARS - 1), stripUrls(input.definition).text);
+  // 이미 정제된 태그만 (빈 값·# 포함 값 무시), 최대 3개 (Gemini tag-fix #3)
+  const tagLine = (input.tags ?? [])
+    .filter((t) => /^[\p{L}\p{N}_]{1,40}$/u.test(t))
+    .slice(0, NEWS_MAX_TAGS)
+    .map((t) => `#${t}`)
+    .join(" ");
+  const suffix = tagLine ? `\n\n${tagLine}` : "";
+  // 제목 줄은 Thread 제목 길이로 묶어 정의 자리를 남긴다 (Gemini tag-fix #1)
+  const head = truncateAtWord(title, THREAD_TITLE_MAX_CHARS);
+  const body = stripUrls(input.definition).text;
+  const room = NEWS_BIT_MAX_CHARS - head.length - 1 - suffix.length;
+  const first = `${head}\n${truncateAtWord(body, Math.max(0, room))}${suffix}`;
   const second = withBody("Why it matters", stripUrls(input.whyItMatters).text);
   return { ok: true, segments: [first, second], threadTitle: toThreadTitle(title) };
 }

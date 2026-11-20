@@ -19,6 +19,7 @@ import {
   buildConceptThread,
   buildNewsThread,
   buildSourceBit,
+  cleanTags,
   checkNumbersMulti,
   findBannedPhrases,
   keepAllowedWikiLinks,
@@ -583,7 +584,13 @@ export async function runCuration(deps: CurationDeps): Promise<CurationSummary> 
           log(`concept ${c.slug} draft failed — stays PENDING without a draft`);
           continue;
         }
-        const ct = buildConceptThread({ term: c.term, definition: cg.output.definition, whyItMatters: cg.output.whyItMatters });
+        const ct = buildConceptThread({
+          term: c.term,
+          definition: cg.output.definition,
+          whyItMatters: cg.output.whyItMatters,
+          // 뉴스 요약과 같은 규칙의 첫 태그 — 대표 태그가 목록 밖이어도 모델 태그로 채운다 (Gemini tag-fix #2)
+          tags: cleanTags(gen.output.tags ?? [], sourceById.get(lead.sourceId)?.tag ?? sourceById.get(lead.sourceId)?.category ?? "ai").slice(0, 1),
+        });
         try {
           await store.createConceptDraft({
             slug: c.slug,
