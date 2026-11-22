@@ -105,6 +105,7 @@ test.describe("v2 event thread", () => {
         `https://news.example/${V2}`,
         JSON.stringify([
           `${V2_HEADLINE}\n- Needs an [[E2E Concept]] to work.\n- Fact two.\n\n#ai`,
+          `Background\nAn E2E model used for testing.\n\nWhy it matters\nThe background bit is not counted as a source.`,
           `Source: OpenAI News — Point one.\nhttps://news.example/${V2}-a`,
           `Source: Simon Willison — Point two.\nhttps://news.example/${V2}-b`,
         ]),

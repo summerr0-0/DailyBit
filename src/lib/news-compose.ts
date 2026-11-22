@@ -155,6 +155,7 @@ export type NewsThreadOutput = {
   bullets: string[];
   sources: { index: number; point: string }[];
   tags: string[];
+  background?: { what?: string; risk?: string };
 };
 /** tag: 소스 대표 태그(없으면 category) */
 export type NewsThreadSource = { name: string; url: string; category: string; tag?: string };
@@ -190,7 +191,8 @@ function toThreadTitle(text: string): string {
 /**
  * 구조화 출력 + 출처 목록 → Thread segments.
  * segments[0] = 요약 Bit(URL 없음, 태그 포함; 500자 초과면 뒤 불릿부터 제거, 2개 미만이면 실패).
- * segments[1..] = 출처 입력 순서대로 출처 Bit. output.sources[].index는 sources 배열 인덱스.
+ * segments[1] = 배경 Bit(있을 때: Background / Why it's dangerous|Why it matters).
+ * 그다음 = 출처 입력 순서대로 출처 Bit. output.sources[].index는 sources 배열 인덱스.
  * 숫자 검사는 호출자가 checkNumbersMulti로 따로 한다.
  */
 export function buildNewsThread(output: NewsThreadOutput, sources: readonly NewsThreadSource[]): BuildNewsThreadResult {
@@ -228,13 +230,39 @@ export function buildNewsThread(output: NewsThreadOutput, sources: readonly News
     if (p.text) points.set(s.index, p.text);
   }
 
-  const segments = [summary, ...sources.map((src, i) => buildSourceBit({ ...src, point: points.get(i) }))];
+  // 배경 Bit (2026-11-22): 요약 바로 다음. 낯선 대상이 뭔지 + 보안이면 왜 위험한지.
+  const what = stripUrls(output.background?.what ?? "");
+  const risk = stripUrls(output.background?.risk ?? "");
+  urlRemoved ||= what.removed || risk.removed;
+  // 보안 판단: 대표 태그가 security이거나 출처 중 하나라도 보안 매체 (Gemini bg #4)
+  const security = tags.includes("security") || sources.some((s) => s.category === "security");
+  const background = buildBackgroundBit(what.text, risk.text, security);
+
+  const segments = [
+    summary,
+    ...(background ? [background] : []),
+    ...sources.map((src, i) => buildSourceBit({ ...src, point: points.get(i) })),
+  ];
 
   const warnings: string[] = [];
   if (urlRemoved) warnings.push("llm_url_removed");
-  warnings.push(...findBannedPhrases([headline, ...bullets, ...points.values()].join("\n")));
+  warnings.push(...findBannedPhrases([headline, ...bullets, what.text, risk.text, ...points.values()].join("\n")));
 
   return { ok: true, segments, threadTitle: toThreadTitle(headline), warnings };
+}
+
+/** "Background" + 무엇인지, 빈 줄, "Why it's dangerous"(보안) / "Why it matters" + 이유. 둘 다 비면 null. 500자 이내. */
+export function buildBackgroundBit(what: string, risk: string, security: boolean): string | null {
+  const sections: [string, string][] = [];
+  if (what) sections.push(["Background", what]);
+  if (risk) sections.push([security ? "Why it's dangerous" : "Why it matters", risk]);
+  if (sections.length === 0) return null;
+  const join = (list: [string, string][]) => list.map(([h, b]) => `${h}\n${b}`).join("\n\n");
+  if (join(sections).length <= NEWS_BIT_MAX_CHARS) return join(sections);
+  // 넘치면 각 본문을 나눠 자른다 — 두 번째 제목만 남고 본문이 잘리는 일이 없게 (Gemini bg #5)
+  const overhead = join(sections.map(([h]) => [h, ""] as [string, string])).length;
+  const room = Math.floor((NEWS_BIT_MAX_CHARS - overhead) / sections.length);
+  return join(sections.map(([h, b]) => [h, truncateAtWord(b, room)] as [string, string]));
 }
 
 function withBody(prefixLine: string, body: string): string {

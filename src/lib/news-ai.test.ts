@@ -218,6 +218,7 @@ describe("generateEventNews", () => {
       { index: 0, point: "announced it" },
     ],
     tags: ["llm"],
+    background: { what: " MONAI Label is an open-source server for labeling medical images. ", risk: "x".repeat(300) },
     concepts: [{ term: " Quantization ", aliases: ["4-bit quantization", 3] }],
   };
 
@@ -233,10 +234,12 @@ describe("generateEventNews", () => {
           { index: 1, point: "tested it" },
         ],
         tags: ["llm"],
+        background: { what: "MONAI Label is an open-source server for labeling medical images.", risk: expect.stringMatching(/^x{200,}…?$/) },
         concepts: [{ term: "Quantization", aliases: ["4-bit quantization"] }],
       },
     });
     const params = create.mock.calls[0][0];
+    expect(params.system).toMatch(/why it is dangerous/i);
     expect(params.model).toBe(process.env.NEWS_WRITE_MODEL ?? "claude-sonnet-5-5");
     expect(params.output_config?.format?.type).toBe("json_schema");
     expect(params.system).toMatch(/untrusted/i);

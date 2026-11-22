@@ -89,7 +89,8 @@ function NewsMeta({
   expiryLabel: string;
   statusBySlug: Map<string, ConceptStatusDTO>;
 }) {
-  const sourceCount = draft.eventKey ? Math.max(0, draft.segments.length - 1) : 1;
+  // 출처 Bit만 센다 — 요약·배경 Bit("Background"/"Why it…")는 출처가 아니다 (2026-11-22)
+  const sourceCount = draft.eventKey ? draft.segments.filter((seg) => seg.startsWith("Source: ")).length : 1;
   return (
     <div data-testid="news-meta" style={{ marginBottom: 12 }}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 12 }}>

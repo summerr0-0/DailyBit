@@ -229,3 +229,54 @@ describe("keepAllowedWikiLinks (wiki-links D5)", () => {
     );
   });
 });
+
+describe("buildNewsThread — background bit (2026-11-22)", () => {
+  const base = {
+    headline: "Attackers' AI agents found a zero-day in MONAI Label",
+    bullets: ["b1", "b2", "b3"],
+    sources: [{ index: 0, point: "Amazon's write-up" }],
+    tags: ["security"],
+  };
+  const sec = { name: "The Hacker News", url: "https://thehackernews.com/x", category: "security" };
+
+  it("puts Background + Why it's dangerous right after the summary for security news", () => {
+    const r = buildNewsThread(
+      { ...base, background: { what: "MONAI Label is an open-source server for labeling medical scans.", risk: "Anyone on the network can write files and get root. https://evil.example" } },
+      [sec],
+    );
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.segments).toHaveLength(3);
+    expect(r.segments[1]).toBe(
+      "Background\nMONAI Label is an open-source server for labeling medical scans.\n\nWhy it's dangerous\nAnyone on the network can write files and get root.",
+    );
+    expect(r.warnings).toContain("llm_url_removed");
+  });
+
+  it("uses 'Why it matters' for non-security news and skips empty parts", () => {
+    const r = buildNewsThread({ ...base, tags: ["ai"], background: { what: "", risk: "It changes how apps stream data." } }, [srcA]);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.segments[1]).toBe("Why it matters\nIt changes how apps stream data.");
+  });
+
+  it("adds no background bit when both parts are empty or missing", () => {
+    const a = buildNewsThread({ ...base, background: { what: " ", risk: "" } }, [sec]);
+    const b = buildNewsThread(base, [sec]);
+    if (!a.ok || !b.ok) throw new Error("expected ok");
+    expect(a.segments).toHaveLength(2);
+    expect(b.segments).toHaveLength(2);
+  });
+
+  it("keeps the background bit within 500 characters and keeps both bodies", () => {
+    const r = buildNewsThread({ ...base, background: { what: words(80), risk: words(80, "risk") } }, [sec]);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.segments[1].length).toBeLessThanOrEqual(NEWS_BIT_MAX_CHARS);
+    expect(r.segments[1]).toMatch(/\n\nWhy it's dangerous\nrisk risk/);
+  });
+
+  it("says 'Why it's dangerous' when the story is tagged security even if the lead source is a dev blog", () => {
+    const dev = { name: "Node.js Blog", url: "https://nodejs.org/x", category: "dev", tag: "nodejs" };
+    const r = buildNewsThread({ ...base, tags: ["security"], background: { what: "", risk: "Unpatched servers can crash." } }, [dev]);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.segments[1]).toBe("Why it's dangerous\nUnpatched servers can crash.");
+  });
+});
