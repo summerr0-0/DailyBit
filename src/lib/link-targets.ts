@@ -6,16 +6,25 @@ const has = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k)
 
 // [[링크]] 대상 사전과 백링크 (spec: wiki-links D1, D2, D4).
 
-/** linkKey → threadId. Thread 제목 + 발행된 개념의 이름·별칭. 요청당 한 번만 조회. */
-export const getLinkTargets = cache(async (): Promise<LinkTargets> => {
+/**
+ * linkKey → threadId. Thread 제목 + 발행된 개념의 이름·별칭. 요청당 한 번만 조회.
+ * 방문자용(includePrivate=false)에는 공개 Bit가 있는 Thread만 넣는다 — 비공개 Thread의 제목·id가
+ * 링크로 새지 않게 (2026-11-22 비공개 노출 수정).
+ */
+export const getLinkTargets = cache(async (includePrivate = false): Promise<LinkTargets> => {
   const [threads, concepts] = await Promise.all([
-    prisma.thread.findMany({ select: { id: true, title: true }, orderBy: { createdAt: "asc" } }),
+    prisma.thread.findMany({
+      where: includePrivate ? undefined : { bits: { some: { private: false } } },
+      select: { id: true, title: true },
+      orderBy: { createdAt: "asc" },
+    }),
     prisma.concept.findMany({
       where: { status: "PUBLISHED", threadId: { not: null } },
       select: { term: true, aliases: true, threadId: true },
     }),
   ]);
   const targets: LinkTargets = {};
+  const visible = new Set(threads.map((t) => t.id));
   for (const t of threads) {
     const k = linkKey(t.title);
     if (k && !has(targets, k)) targets[k] = t.id;
@@ -24,7 +33,7 @@ export const getLinkTargets = cache(async (): Promise<LinkTargets> => {
   for (const c of concepts) {
     for (const name of [c.term, ...c.aliases]) {
       const k = linkKey(name);
-      if (k && c.threadId) targets[k] = c.threadId;
+      if (k && c.threadId && visible.has(c.threadId)) targets[k] = c.threadId;
     }
   }
   return targets;
@@ -53,7 +62,8 @@ export type Backlink = { threadId: string | null; title: string; bitId: string; 
 
 /** 이 Thread를 [[ ]]로 가리키는 공개 Bit들 (같은 Thread 안의 Bit 제외, Thread당 1건). */
 export async function getBacklinks(threadId: string, includePrivate = false): Promise<Backlink[]> {
-  const targets = await getLinkTargets();
+  // 이 Thread를 가리키는 키를 찾는 용도라 전체 사전을 쓴다. 결과 Bit는 아래에서 공개 여부로 거른다.
+  const targets = await getLinkTargets(true);
   const keys = new Set(Object.entries(targets).filter(([, id]) => id === threadId).map(([k]) => k));
   if (keys.size === 0) return [];
   const rows = await prisma.bit.findMany({

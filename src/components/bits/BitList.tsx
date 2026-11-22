@@ -7,7 +7,7 @@ import { RebitCard } from "./RebitCard";
 type Props = { filterTags?: string[]; isLoggedIn?: boolean; includePrivate?: boolean };
 
 export async function BitList({ filterTags = [], isLoggedIn = false, includePrivate = false }: Props) {
-  const [items, links] = await Promise.all([getBitsFiltered(filterTags, includePrivate), getLinkTargets()]);
+  const [items, links] = await Promise.all([getBitsFiltered(filterTags, includePrivate), getLinkTargets(includePrivate)]);
 
   if (items.length === 0) {
     return (

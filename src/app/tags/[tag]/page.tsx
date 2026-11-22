@@ -26,7 +26,7 @@ export default async function TagPage({
   const [bits, tagCloud, links] = await Promise.all([
     getBitsByTag(normalized, loggedIn),
     getTagCloud(loggedIn),
-    getLinkTargets(),
+    getLinkTargets(loggedIn),
   ]);
 
   return (

@@ -173,8 +173,8 @@ export async function getStats(): Promise<GardenStats> {
   return { totalBits, curStreak, maxStreak };
 }
 
-/** KST 날짜(yyyy-mm-dd)에 작성된 Bit를 최신순으로 반환한다. */
-export async function getBitsByDateKST(dateKey: string): Promise<BitWithAuthor[]> {
+/** KST 날짜(yyyy-mm-dd)에 쓴 Bit를 오래된 순으로. 방문자에게는 공개 Bit만 (2026-11-22 비공개 노출 수정). */
+export async function getBitsByDateKST(dateKey: string, includePrivate = false): Promise<BitWithAuthor[]> {
   const me = await prisma.user.findUnique({
     where: { email: DEV_USER.email },
     select: { id: true },
@@ -188,6 +188,7 @@ export async function getBitsByDateKST(dateKey: string): Promise<BitWithAuthor[]
     where: {
       authorId: me.id,
       createdAt: { gte: startUTC, lt: endUTC },
+      ...(includePrivate ? {} : { private: false }),
     },
     orderBy: { createdAt: "asc" },
     select: {

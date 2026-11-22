@@ -20,16 +20,20 @@ export type ThreadWithBits = {
   }[];
 };
 
-export async function getThreads(): Promise<ThreadSummary[]> {
+/**
+ * Thread 목록. 방문자에게는 공개 Bit가 하나라도 있는 Thread만, 공개 Bit 수로 보여준다.
+ * 비공개 Bit만 있는 Thread는 제목도 숨긴다 (2026-11-22 비공개 노출 수정).
+ */
+export async function getThreads(includePrivate = false): Promise<ThreadSummary[]> {
   const author = await ensureDevUser();
   const rows = await prisma.thread.findMany({
-    where: { authorId: author.id },
+    where: { authorId: author.id, ...(includePrivate ? {} : { bits: { some: { private: false } } }) },
     orderBy: { updatedAt: "desc" },
     select: {
       id: true,
       title: true,
       updatedAt: true,
-      _count: { select: { bits: true } },
+      _count: { select: { bits: includePrivate ? true : { where: { private: false } } } },
     },
   });
 
@@ -66,13 +70,17 @@ export async function deleteThread(id: string): Promise<boolean> {
   return count > 0;
 }
 
-export async function getThread(id: string): Promise<ThreadWithBits | null> {
+/**
+ * Thread와 그 Bit. 방문자에게는 공개 Bit만 주고, 공개 Bit가 없으면 Thread 자체를 없는 것으로 본다(null).
+ */
+export async function getThread(id: string, includePrivate = false): Promise<ThreadWithBits | null> {
   const row = await prisma.thread.findUnique({
     where: { id },
     select: {
       id: true,
       title: true,
       bits: {
+        where: includePrivate ? undefined : { private: false },
         orderBy: { createdAt: "asc" },
         select: {
           id: true,
@@ -85,6 +93,7 @@ export async function getThread(id: string): Promise<ThreadWithBits | null> {
     },
   });
 
+  if (row && !includePrivate && row.bits.length === 0) return null;
   return row;
 }
 

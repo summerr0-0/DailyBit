@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 
 export default async function ThreadsPage() {
   // 홈 사이드바와 같은 기준: 관리자면 비공개 글의 태그도 센다
-  const [threads, tagCloud] = await Promise.all([getThreads(), isLoggedIn().then((owner) => getTagCloud(owner))]);
+  const owner = await isLoggedIn();
+  const [threads, tagCloud] = await Promise.all([getThreads(owner), getTagCloud(owner)]);
 
   return (
     <div className="db-page">

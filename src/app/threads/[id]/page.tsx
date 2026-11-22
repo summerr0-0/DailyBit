@@ -13,7 +13,7 @@ export default async function ThreadPage({ params }: Props) {
   const { id } = await params;
   const owner = await isLoggedIn();
   // 홈 사이드바와 같은 기준: 관리자면 비공개 글의 태그도 센다
-  const [thread, tagCloud, links] = await Promise.all([getThread(id), getTagCloud(owner), getLinkTargets()]);
+  const [thread, tagCloud, links] = await Promise.all([getThread(id, owner), getTagCloud(owner), getLinkTargets(owner)]);
 
   if (!thread) notFound();
   const backlinks = await getBacklinks(thread.id, owner);
