@@ -51,6 +51,7 @@ async function dryRunDeps(): Promise<{ deps: CurationDeps; report: () => void }>
         bullets: ["Fixture fact one.", "Fixture fact two.", "Released 2 models."],
         sources: srcs.map((_, index) => ({ index, point: `Fixture point ${index + 1}.` })),
         tags: ["ai"],
+        background: { what: "", risk: "" },
         concepts: [{ term: "Quantization", aliases: ["4-bit quantization"] }],
       },
     }),

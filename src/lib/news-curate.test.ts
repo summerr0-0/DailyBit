@@ -78,6 +78,7 @@ function makeDeps(opts: Opts) {
           bullets: ["Fact one.", "Fact two.", "Fact three."],
           sources: input.sources.map((_, index) => ({ index, point: `Point ${index}.` })),
           tags: ["ai"],
+          background: { what: "", risk: "" },
           concepts: opts.concepts ?? [],
         },
       })),
@@ -225,6 +226,31 @@ describe("known events and late sources (v2 D1, D8, R5)", () => {
     expect(draft.warnings).toContain("source_added_later");
     expect(first.generateEvent).toHaveBeenCalledTimes(1);
     expect(first.generateSourcePoint).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the background bit second and appends late sources after it (2026-11-22)", async () => {
+    const first = makeDeps({
+      feeds: [{ sourceId: "openai", items: [entry("o1", hoursAgo(3))] }],
+      scores: (k) => ({ [k[0]]: [9, "gpt"] }),
+      generateEvent: async (input) => ({
+        ok: true,
+        output: {
+          headline: `Headline ${input.eventTitle}`,
+          bullets: ["Fact one.", "Fact two.", "Fact three."],
+          sources: input.sources.map((_, index) => ({ index, point: `Point ${index}.` })),
+          tags: ["ai"],
+          background: { what: "GPT is a family of language models.", risk: "Apps built on it may change behaviour." },
+          concepts: [],
+        },
+      }),
+    });
+    await runCuration(first.deps);
+    await runCuration({ ...first.deps, fetchAll: async () => [{ sourceId: "willison", items: [entry("w1", hoursAgo(1))] }] as FeedResult[] });
+    const draft = newsDrafts(first.mem)[0];
+    expect(draft.segments).toHaveLength(4);
+    expect(draft.segments[1]).toBe("Background\nGPT is a family of language models.\n\nWhy it matters\nApps built on it may change behaviour.");
+    expect(draft.segments[2]).toMatch(/^Source: /);
+    expect(draft.segments[3]).toContain("Late point.");
   });
 
   it("skips late articles of a closed event (R5.2, D13e)", async () => {
