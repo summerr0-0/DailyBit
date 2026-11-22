@@ -45,11 +45,10 @@ export async function ProfileCard() {
   const monthLabels = monthLabelsForWeeks(garden.weeks);
 
   return (
-    <div style={{
+    <div className="db-profile" style={{
       background: "#FFFDF8",
       border: "1px solid #E8E1D2",
       borderRadius: "20px",
-      padding: "30px 32px",
       boxShadow: "0 1px 2px rgba(60,50,30,0.04)",
     }}>
       {/* ── Identity row ── */}
@@ -66,7 +65,7 @@ export async function ProfileCard() {
           <img src="/avatar.png" alt="Irin" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
 
-        <div style={{ flex: 1, minWidth: "260px" }}>
+        <div style={{ flex: 1, minWidth: "min(260px, 100%)" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: "10px", flexWrap: "wrap" }}>
             <span style={{ fontSize: "21px", fontWeight: 700, letterSpacing: "-0.3px" }}>Irin Jeong</span>
           </div>
@@ -99,7 +98,7 @@ export async function ProfileCard() {
       <div style={{ height: "1px", background: "#EFE9DB", margin: "26px 0 20px" }} />
 
       {/* ── Stats ── */}
-      <div style={{ display: "flex", gap: "28px", flexWrap: "wrap", alignItems: "baseline", marginBottom: "18px" }}>
+      <div className="db-stats" style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", marginBottom: "18px" }}>
         {[
           { value: stats.totalBits, label: "total bits", accent: false },
           { value: stats.curStreak,  label: "day streak",    accent: true  },
@@ -119,7 +118,7 @@ export async function ProfileCard() {
       </div>
 
       {/* ── Contribution graph ── */}
-      <div style={{ overflowX: "auto", paddingBottom: "4px" }}>
+      <div className="db-garden-scroll">
         <div style={{ display: "inline-block", minWidth: "100%" }}>
           {/* Month labels */}
           <div style={{ display: "flex", gap: "3px", marginLeft: "30px", marginBottom: "5px" }}>
@@ -132,7 +131,7 @@ export async function ProfileCard() {
 
           <div style={{ display: "flex", gap: "5px" }}>
             {/* Day labels */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "3px", width: "25px", flexShrink: 0 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "3px", width: "25px", flexShrink: 0, position: "sticky", left: 0, zIndex: 1, background: "#FFFDF8" }}>
               {DAY_LABELS.map((label, i) => (
                 <div key={i} style={{ height: "13px", fontSize: "10px", color: "#B0A691", lineHeight: "13px", textAlign: "right" }}>
                   {label}

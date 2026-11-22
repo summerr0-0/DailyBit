@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback, useOptimistic, useTransition } from "react";
+import { useCallback, useEffect, useOptimistic, useRef, useTransition } from "react";
 
 type Tag = { tag: string; count: number; isPrivateTag: boolean };
 
@@ -16,7 +16,6 @@ const ROW_BASE: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  width: "100%",
   padding: "8px 11px",
   borderRadius: "10px",
   cursor: "pointer",
@@ -82,20 +81,30 @@ export function TagSidebarClient({ tags, totalCount, selectedTags, isLoggedIn = 
   const activeTag = selectedTags[0] ?? null;
   const allActive = activeTag === null;
 
+  // 모바일 칩 줄에서 선택한 태그가 화면 밖에 있으면 가로로만 스크롤해 보여 준다 (세로 페이지 스크롤 없음)
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list || list.scrollWidth <= list.clientWidth) return;
+    const active = list.querySelector<HTMLElement>("[aria-pressed='true']");
+    if (active) list.scrollLeft = active.offsetLeft - list.offsetLeft - (list.clientWidth - active.offsetWidth) / 2;
+  }, [activeTag]);
+
   return (
-    <div style={{
+    <div className="db-tag-card" role="navigation" aria-label="Tags" style={{
       background: "#FFFDF8",
       border: "1px solid #E8E1D2",
       borderRadius: "18px",
       padding: "18px",
       boxShadow: "0 1px 2px rgba(60,50,30,0.04)",
     }}>
-      <div style={{ fontSize: "13px", fontWeight: 700, color: "#8A8170", letterSpacing: "0.4px", marginBottom: "13px" }}>
+      <div className="db-tag-card-title" style={{ fontSize: "13px", fontWeight: 700, color: "#8A8170", letterSpacing: "0.4px", marginBottom: "13px" }}>
         Tags
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+      <div className="db-tag-list" ref={listRef}>
         <button
           onClick={() => setTag(null)}
+          aria-pressed={allActive}
           style={{
             ...ROW_BASE,
             background: allActive ? "#FEF3E8" : "transparent",
@@ -113,6 +122,7 @@ export function TagSidebarClient({ tags, totalCount, selectedTags, isLoggedIn = 
             <div key={tag} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               <button
                 onClick={() => setTag(tag)}
+                aria-pressed={active}
                 style={{
                   ...ROW_BASE,
                   flex: 1,
@@ -145,7 +155,7 @@ export function TagSidebarClient({ tags, totalCount, selectedTags, isLoggedIn = 
                     color: isPrivateTag ? "#C96820" : "#D0C9BC",
                     display: "flex", alignItems: "center",
                   }}
-                  className="hover:bg-[#FEF3E8]"
+                  className="db-tag-lock hover:bg-[#FEF3E8]"
                 >
                   <LockIcon size={12} />
                 </button>

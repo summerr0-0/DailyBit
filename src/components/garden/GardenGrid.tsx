@@ -75,7 +75,7 @@ export function GardenGrid({ data }: { data: GardenData }) {
 
   return (
     <div>
-      <div className="overflow-x-auto">
+      <div className="db-garden-scroll">
         <div className="flex gap-1" data-testid="garden-grid">
           {data.weeks.map((week, wi) => (
             <div key={wi} className="flex flex-col gap-1">

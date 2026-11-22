@@ -52,7 +52,7 @@ export function BitCard({ bit, isLoggedIn = false, links }: Props) {
         </Link>
       )}
 
-      <p style={{ marginTop: "5px", fontSize: "15.5px", lineHeight: 1.68, color: "#33302A", whiteSpace: "pre-wrap" }}>
+      <p style={{ marginTop: "5px", fontSize: "15.5px", lineHeight: 1.68, color: "#33302A", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
         {renderBitContent(bit.content, links)}
       </p>
 

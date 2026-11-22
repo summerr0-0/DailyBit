@@ -163,7 +163,7 @@ export function CommentSection({ bitId, commentCount, isLoggedIn }: Props) {
                 onChange={(e) => setAuthor(e.target.value)}
                 placeholder="Name (optional)"
                 maxLength={50}
-                style={{ flex: 1, fontSize: "13px", border: "1px solid #E8E1D2", borderRadius: "8px", padding: "6px 10px", background: "#FDFBF7", outline: "none", fontFamily: "inherit", color: "#33302A" }}
+                style={{ flex: 1, minWidth: 0, fontSize: "13px", border: "1px solid #E8E1D2", borderRadius: "8px", padding: "6px 10px", background: "#FDFBF7", outline: "none", fontFamily: "inherit", color: "#33302A" }}
               />
               <input
                 type="password"
@@ -211,7 +211,7 @@ export function CommentSection({ bitId, commentCount, isLoggedIn }: Props) {
               {comments.map((c) => (
                 <div key={c.id}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
-                    <div>
+                    <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
                       <span style={{ fontSize: "12.5px", fontWeight: 600, color: "#4A4438" }}>{c.author}</span>
                       <span style={{ fontSize: "11.5px", color: "#C0B9A9", marginLeft: "6px" }}>{timeAgo(c.createdAt)}</span>
                       <p style={{ margin: "3px 0 0", fontSize: "13.5px", color: "#33302A", lineHeight: 1.55 }}>{c.content}</p>
@@ -229,7 +229,7 @@ export function CommentSection({ bitId, commentCount, isLoggedIn }: Props) {
                   </div>
 
                   {deletingId === c.id && (
-                    <div style={{ marginTop: "8px", display: "flex", gap: "6px", alignItems: "center" }}>
+                    <div style={{ marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
                       <input
                         type="password"
                         value={deletePassword}
