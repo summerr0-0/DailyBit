@@ -30,7 +30,7 @@ export default async function TagPage({
   ]);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F4F0E7", padding: "32px 20px 80px" }}>
+    <div className="db-page">
       <div style={{ maxWidth: "900px", margin: "0 auto" }}>
 
         {/* Back */}
@@ -49,7 +49,7 @@ export default async function TagPage({
           Back to feed
         </Link>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: "24px", alignItems: "start" }}>
+        <div className="db-grid">
 
           {/* Main */}
           <div>
@@ -86,16 +86,16 @@ export default async function TagPage({
           </div>
 
           {/* Tag sidebar */}
-          <div style={{ position: "sticky", top: "24px" }}>
-            <div style={{
+          <div className="db-side db-side-first">
+            <div className="db-tag-card" role="navigation" aria-label="Tags" style={{
               background: "#FFFDF8", border: "1px solid #E8E1D2",
               borderRadius: "18px", padding: "18px",
               boxShadow: "0 1px 2px rgba(60,50,30,0.04)",
             }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: "#8A8170", letterSpacing: "0.4px", marginBottom: "13px" }}>
+              <div className="db-tag-card-title" style={{ fontSize: "13px", fontWeight: 700, color: "#8A8170", letterSpacing: "0.4px", marginBottom: "13px" }}>
                 Tags
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+              <div className="db-tag-list">
                 <Link
                   href="/"
                   style={{

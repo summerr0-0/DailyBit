@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, type CSSProperties } from "react";
 import Link from "next/link";
 import { BitList } from "@/components/bits/BitList";
 import { BitComposer } from "@/components/bits/BitComposer";
@@ -18,7 +18,7 @@ export default async function HomePage({ searchParams }: Props) {
   const loggedIn = await isLoggedIn();
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F4F0E7", padding: "40px 20px 80px" }}>
+    <div className="db-page">
       <div style={{ maxWidth: "1060px", margin: "0 auto" }}>
 
         {/* Header */}
@@ -37,16 +37,10 @@ export default async function HomePage({ searchParams }: Props) {
         </Suspense>
 
         {/* Body grid: feed + tag sidebar */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 252px",
-          gap: "22px",
-          marginTop: "22px",
-          alignItems: "start",
-        }}>
+        <div className="db-grid" style={{ "--db-side": "252px", marginTop: "22px" } as CSSProperties}>
 
           {/* Main feed */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px", minWidth: 0 }}>
             {loggedIn && <BitComposer />}
 
             {selectedTags.length > 0 && (
@@ -59,7 +53,7 @@ export default async function HomePage({ searchParams }: Props) {
                 </span>
                 <Link
                   href="/"
-                  style={{ fontSize: "13px", color: "#9C4A1A", fontWeight: 600, textDecoration: "none" }}
+                  style={{ fontSize: "13px", color: "#9C4A1A", fontWeight: 600, textDecoration: "none", flexShrink: 0, whiteSpace: "nowrap", marginLeft: "10px" }}
                 >
                   Show all ✕
                 </Link>
@@ -76,7 +70,7 @@ export default async function HomePage({ searchParams }: Props) {
           </div>
 
           {/* Tag sidebar */}
-          <div style={{ position: "sticky", top: "24px" }}>
+          <div className="db-side db-side-first">
             <Suspense fallback={
               <div style={{ background: "#FFFDF8", border: "1px solid #E8E1D2", borderRadius: "18px", height: "200px" }} />
             }>

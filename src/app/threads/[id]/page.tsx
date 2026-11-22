@@ -21,7 +21,7 @@ export default async function ThreadPage({ params }: Props) {
   const pageLinks = pickLinks(links, thread.bits.map((b) => b.content));
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F4F0E7", padding: "32px 20px 80px" }}>
+    <div className="db-page">
       <div style={{ maxWidth: "900px", margin: "0 auto" }}>
 
         {/* Back button */}
@@ -46,15 +46,10 @@ export default async function ThreadPage({ params }: Props) {
         </Link>
 
         {/* Content grid */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 220px",
-          gap: "24px",
-          alignItems: "start",
-        }}>
+        <div className="db-grid">
 
           {/* Main: thread bits */}
-          <div>
+          <div style={{ minWidth: 0 }}>
             {/* Thread header */}
             <div style={{
               background: "#FFFDF8",
@@ -100,6 +95,8 @@ export default async function ThreadPage({ params }: Props) {
                   {/* Bit card */}
                   <div style={{
                     flex: 1,
+                    minWidth: 0,
+                    overflowWrap: "anywhere",
                     background: "#FFFDF8",
                     border: "1px solid #E8E1D2",
                     borderRadius: "16px",
@@ -187,21 +184,21 @@ export default async function ThreadPage({ params }: Props) {
           </div>
 
           {/* Sidebar: categories */}
-          <div style={{ position: "sticky", top: "24px" }}>
-            <div style={{
+          <div className="db-side">
+            <div className="db-tag-card" role="navigation" aria-label="Tags" style={{
               background: "#FFFDF8",
               border: "1px solid #E8E1D2",
               borderRadius: "18px",
               padding: "18px",
               boxShadow: "0 1px 2px rgba(60,50,30,0.04)",
             }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: "#8A8170", letterSpacing: "0.4px", marginBottom: "13px" }}>
+              <div className="db-tag-card-title" style={{ fontSize: "13px", fontWeight: 700, color: "#8A8170", letterSpacing: "0.4px", marginBottom: "13px" }}>
                 Tags
               </div>
               {tagCloud.length === 0 ? (
                 <p style={{ fontSize: "13px", color: "#C0B9A9" }}>No tags</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                <div className="db-tag-list">
                   {tagCloud.map(({ tag, count }) => (
                     <Link
                       key={tag}

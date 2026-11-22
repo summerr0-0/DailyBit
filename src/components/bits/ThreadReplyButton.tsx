@@ -92,7 +92,8 @@ export function ThreadReplyButton({ bitId, hasThread = false, defaultTitle = "" 
           background: "rgba(42,38,32,0.35)",
           zIndex: 50,
           display: "flex",
-          alignItems: "center",
+          alignItems: "safe center",
+          overflowY: "auto",
           justifyContent: "center",
           padding: "20px",
         }}
@@ -105,6 +106,8 @@ export function ThreadReplyButton({ bitId, hasThread = false, defaultTitle = "" 
             padding: "20px",
             width: "100%",
             maxWidth: "520px",
+            maxHeight: "calc(100dvh - 32px)",
+            overflowY: "auto",
             boxShadow: "0 8px 32px rgba(42,38,32,0.12)",
           }}>
             <p style={{ fontSize: "12.5px", color: "#C96820", fontWeight: 600, marginBottom: "12px" }}>

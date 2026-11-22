@@ -145,3 +145,37 @@
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: none; }
 }
+
+/* ── Responsive page layout (2026-11-22 mobile pass) ──
+   Pages keep their inline colours; layout that must change by width lives here,
+   because inline styles cannot hold media queries. */
+.db-page { min-height: 100vh; background: #F4F0E7; padding: 32px 20px 80px; overflow-wrap: anywhere; }
+.db-grid { display: grid; grid-template-columns: minmax(0, 1fr) var(--db-side, 220px); gap: 24px; align-items: start; }
+.db-side { position: sticky; top: 24px; }
+.db-tag-list { display: flex; flex-direction: column; gap: 3px; }
+.db-garden-scroll { overflow-x: auto; padding-bottom: 4px; }
+.db-profile { padding: 30px 32px; }
+.db-stats { gap: 28px; }
+
+@media (max-width: 760px) {
+  .db-page { padding: 20px 14px 64px; }
+  .db-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .db-side { position: static; }
+  /* home / list pages: tag filter goes above the feed */
+  .db-side-first { order: -1; }
+  /* sidebar tag list becomes one swipeable chip row */
+  .db-tag-card { padding: 12px !important; border-radius: 14px !important; }
+  /* visually hidden, still announced */
+  .db-tag-card-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  /* owner-only lock toggle is too easy to hit while swiping — desktop only */
+  .db-tag-lock { display: none !important; }
+  .db-tag-list { flex-direction: row; overflow-x: auto; gap: 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .db-tag-list::-webkit-scrollbar { display: none; }
+  .db-tag-list > * { flex: none; white-space: nowrap; }
+  .db-tag-list button, .db-tag-list a { gap: 8px; }
+  /* show the newest weeks first: scroll starts at the right edge */
+  .db-garden-scroll { direction: rtl; }
+  .db-garden-scroll > * { direction: ltr; }
+  .db-profile { padding: 20px 18px; }
+  .db-stats { gap: 6px 18px; }
+}
