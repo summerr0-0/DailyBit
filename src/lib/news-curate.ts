@@ -1,4 +1,4 @@
-import type { NewsSource } from "@/lib/news-sources";
+import type { NewsCategory, NewsSource } from "@/lib/news-sources";
 import type { FeedEntry, FeedResult } from "@/lib/news-feed";
 import { cleanUrl, normalizeUrl } from "@/lib/news-feed";
 import type {
@@ -36,6 +36,11 @@ export const FRESH_WINDOW_MS = 48 * 60 * 60 * 1000; // v1 D6
 export const FEED_ITEM_RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // v1 D5
 export const KNOWN_EVENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // v2 D1
 export const MIN_SCORE = 6; // v1 D7
+/** 보안 뉴스가 너무 많이 와서 기준을 올린다 (2026-11-22 요청: 14일간 초안 24개 중 보안 24, AI 3). */
+export const MIN_SCORE_BY_CATEGORY: Partial<Record<NewsCategory, number>> = { security: 8 };
+export function minScoreFor(category: NewsCategory | undefined): number {
+  return (category && MIN_SCORE_BY_CATEGORY[category]) ?? MIN_SCORE;
+}
 export const MAX_SCORED_PER_RUN = 60; // v1 D7
 export const MAX_EVENTS_PER_RUN = 3; // v2 D2 (사건 작성 시도 수) — AI·보안
 /** 개발(Java·Spring·React·Next.js·Node.js) 사건은 AI·보안과 따로, 최근 24시간 기준 최대 5개 (2026-11-20 요청) */
@@ -220,10 +225,10 @@ export function roundRobinBySource<T extends { sourceId: string; publishedAt: Da
 export type EventGroup = { eventKey: string; items: FeedItemRow[]; score: number };
 
 /** 6점 이상 풀을 사건 키로 묶고 사건 점수(최고점)순 정렬. 키 없는 v1 후보는 제목으로 키를 만든다 (v2 D2, R9.1). */
-export function groupByEvent(pool: FeedItemRow[]): EventGroup[] {
+export function groupByEvent(pool: FeedItemRow[], minScore: (item: FeedItemRow) => number = () => MIN_SCORE): EventGroup[] {
   const groups = new Map<string, FeedItemRow[]>();
   for (const item of pool) {
-    if ((item.score ?? 0) < MIN_SCORE) continue;
+    if ((item.score ?? 0) < minScore(item)) continue;
     const key = item.eventKey || normalizeEventKey(item.title) || `item-${item.id}`;
     const list = groups.get(key) ?? [];
     list.push(item);
@@ -249,6 +254,7 @@ export async function runCuration(deps: CurationDeps): Promise<CurationSummary> 
   const { store } = deps;
   const sourceById = new Map(deps.sources.map((s) => [s.id, s]));
   const sourceName = (id: string) => sourceById.get(id)?.name ?? id;
+  const itemMinScore = (i: { sourceId: string }) => minScoreFor(sourceById.get(i.sourceId)?.category);
   const freshCutoff = new Date(now.getTime() - FRESH_WINDOW_MS);
 
   const summary: CurationSummary = {
@@ -324,7 +330,7 @@ export async function runCuration(deps: CurationDeps): Promise<CurationSummary> 
       if (!r) return; // 모델이 빠뜨림 → 다음 실행에서 재채점
       const score = Math.round(r.score);
       const eventKey = normalizeEventKey(r.event) || normalizeEventKey(e.title) || null;
-      if (score >= MIN_SCORE) {
+      if (score >= itemMinScore(e)) {
         scoredItems.push({ ...toNewItem(e, "CANDIDATE", score, null), eventKey });
         summary.newCandidates++;
         if (eventKey && !knownEvents.some((k) => k.eventKey === eventKey) && !newEvents.has(eventKey)) {
@@ -376,7 +382,7 @@ export async function runCuration(deps: CurationDeps): Promise<CurationSummary> 
     }
   }
 
-  let groups = groupByEvent(await store.findPool());
+  let groups = groupByEvent(await store.findPool(), itemMinScore);
   const eventStatus = new Map(recentEvents.map((e) => [e.eventKey, e.status]));
 
   // 4.5 작성 전 병합 확인: 채점 때 따로 키가 붙은 같은 사건(예: 같은 패치의 다른 CVE 기사)을 합친다.
@@ -399,7 +405,7 @@ export async function runCuration(deps: CurationDeps): Promise<CurationSummary> 
           await store.updateFeedItem(item.id, { eventKey: target });
         }
       }
-      groups = groupByEvent(groups.flatMap((g) => g.items));
+      groups = groupByEvent(groups.flatMap((g) => g.items), itemMinScore);
     } else if (!merged.ok) {
       log("event merge check failed — continuing without it");
     }

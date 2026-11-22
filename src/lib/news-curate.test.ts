@@ -4,6 +4,8 @@ import {
   ScoringUnavailableError,
   createMemoryStore,
   groupByEvent,
+  MIN_SCORE,
+  minScoreFor,
   planConcepts,
   roundRobinBySource,
   runCuration,
@@ -136,7 +138,10 @@ describe("event threads (v2 R0.1, R3)", () => {
   });
 
   it("publishes a single-source event as a Thread too (R3.3)", async () => {
-    const { deps, mem } = makeDeps({ feeds: [{ sourceId: "krebs", items: [entry("k", hoursAgo(1))] }] });
+    const { deps, mem } = makeDeps({
+      feeds: [{ sourceId: "krebs", items: [entry("k", hoursAgo(1))] }],
+      scores: (keys) => Object.fromEntries(keys.map((k) => [k, [8, "ev-k"]])), // 보안 기준 8점
+    });
     await runCuration(deps);
     expect(newsDrafts(mem)[0].segments).toHaveLength(2);
   });
@@ -169,7 +174,7 @@ describe("event threads (v2 R0.1, R3)", () => {
     ];
     const { deps, generateEvent, mem } = makeDeps({
       feeds,
-      scores: (keys) => Object.fromEntries(keys.map((k) => [k, [k.endsWith("/thin") ? 9 : 7, `ev-${k.split("/").pop()}`]])),
+      scores: (keys) => Object.fromEntries(keys.map((k) => [k, [k.endsWith("/thin") ? 9 : 8, `ev-${k.split("/").pop()}`]])),
       extract: async (url) => (url.includes("/thin") ? { ok: false } : { ok: true, rawExtract: BODY }),
     });
     await runCuration(deps);
@@ -385,6 +390,57 @@ describe("collection, freshness and scoring (v1 behaviour kept)", () => {
     ]);
     expect(groups.map((g) => g.eventKey)).toEqual(["e1", "old-v1-item"]);
     expect(groups[0].items.map((i) => i.id)).toEqual(["b", "a"]);
+  });
+});
+
+describe("security score bar (2026-11-22)", () => {
+  it("security needs 8: a 7-point security article is skipped while a 7-point AI article is drafted", async () => {
+    const { deps, mem, generateEvent } = makeDeps({
+      feeds: [
+        { sourceId: "krebs", items: [entry("sec7", hoursAgo(1)), entry("sec8", hoursAgo(1))] },
+        { sourceId: "openai", items: [entry("ai7", hoursAgo(1))] },
+      ],
+      scores: (keys) => Object.fromEntries(keys.map((k) => [k, [k.endsWith("/sec8") ? 8 : 7, `ev-${k.split("/").pop()}`]])),
+    });
+    await runCuration(deps);
+    expect(itemOf(mem, "sec7")).toMatchObject({ status: "SKIPPED", skipReason: "low_score" });
+    expect(generateEvent).toHaveBeenCalledTimes(2);
+    expect(newsDrafts(mem).map((d) => d.eventKey).sort()).toEqual(["ev-ai7", "ev-sec8"]);
+  });
+
+  it("does not draft 7-point security candidates left in the pool from earlier runs", () => {
+    expect(minScoreFor("security")).toBe(8);
+    expect(minScoreFor("ai")).toBe(MIN_SCORE);
+    expect(minScoreFor("dev")).toBe(MIN_SCORE);
+    const groups = groupByEvent(
+      [row({ id: "s", sourceId: "krebs", score: 7, eventKey: "old-sec" }), row({ id: "a", sourceId: "openai", score: 7, eventKey: "ai" })],
+      (i) => minScoreFor(i.sourceId === "krebs" ? "security" : "ai"),
+    );
+    expect(groups.map((g) => g.eventKey)).toEqual(["ai"]);
+  });
+
+  it("drops only the 7-point security source from a mixed event; the AI source still makes the draft", async () => {
+    const { deps, mem, generateEvent } = makeDeps({
+      feeds: [
+        { sourceId: "krebs", items: [entry("sec", hoursAgo(1))] },
+        { sourceId: "openai", items: [entry("ai", hoursAgo(1))] },
+      ],
+      scores: (keys) => Object.fromEntries(keys.map((k) => [k, [7, "shared"]])),
+    });
+    await runCuration(deps);
+    expect(generateEvent).toHaveBeenCalledTimes(1);
+    expect(generateEvent.mock.calls[0][0].sources).toHaveLength(1);
+    expect(itemOf(mem, "sec")).toMatchObject({ status: "SKIPPED", skipReason: "low_score" });
+    expect(minScoreFor(undefined)).toBe(MIN_SCORE);
+  });
+
+  it("runCuration applies the bar to pool candidates too (no new feed items)", async () => {
+    const { deps, generateEvent } = makeDeps({
+      feeds: [{ sourceId: "krebs", items: [] }],
+      initial: [row({ id: "old", sourceId: "krebs", score: 7, eventKey: "old-sec", publishedAt: hoursAgo(2) })],
+    });
+    await runCuration(deps);
+    expect(generateEvent).not.toHaveBeenCalled();
   });
 });
 
