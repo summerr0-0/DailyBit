@@ -87,7 +87,8 @@ export function buildGardenGrid(
  * - 독립 메모: 1점
  * Rebit는 소셜 상호작용이므로 제외한다.
  */
-export async function getGarden(): Promise<GardenData> {
+/** 방문자에게는 공개 Bit만 센다 — 비공개 글을 쓴 날이 잔디로 드러나지 않게 (2026-11-23 사용자 결정). 오너는 전부. */
+export async function getGarden(includePrivate = false): Promise<GardenData> {
   const todayKey = toKstDateKey(new Date());
 
   const me = await prisma.user.findUnique({
@@ -99,7 +100,7 @@ export async function getGarden(): Promise<GardenData> {
   const since = new Date(Date.now() - (WEEKS * 7 + 2) * DAY_MS);
 
   const bits = await prisma.bit.findMany({
-    where: { authorId: me.id, createdAt: { gte: since } },
+    where: { authorId: me.id, createdAt: { gte: since }, ...(includePrivate ? {} : { private: false }) },
     select: { createdAt: true, threadId: true },
   });
 
@@ -119,7 +120,8 @@ export type GardenStats = {
   maxStreak: number;
 };
 
-export async function getStats(): Promise<GardenStats> {
+/** 총 Bit 수·연속 일수. getGarden과 같은 기준으로 방문자에게는 공개 Bit만. */
+export async function getStats(includePrivate = false): Promise<GardenStats> {
   const me = await prisma.user.findUnique({
     where: { email: DEV_USER.email },
     select: { id: true },
@@ -127,9 +129,9 @@ export async function getStats(): Promise<GardenStats> {
   if (!me) return { totalBits: 0, curStreak: 0, maxStreak: 0 };
 
   const [totalBits, bits] = await Promise.all([
-    prisma.bit.count({ where: { authorId: me.id } }),
+    prisma.bit.count({ where: { authorId: me.id, ...(includePrivate ? {} : { private: false }) } }),
     prisma.bit.findMany({
-      where: { authorId: me.id },
+      where: { authorId: me.id, ...(includePrivate ? {} : { private: false }) },
       select: { createdAt: true },
       orderBy: { createdAt: "asc" },
     }),

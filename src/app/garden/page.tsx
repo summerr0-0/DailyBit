@@ -1,3 +1,4 @@
+import { isLoggedIn } from "@/lib/auth";
 import { getGarden } from "@/lib/garden";
 import { GardenGrid } from "@/components/garden/GardenGrid";
 import { SiteShell } from "@/components/layout/SiteShell";
@@ -5,7 +6,7 @@ import { SiteShell } from "@/components/layout/SiteShell";
 export const dynamic = "force-dynamic";
 
 export default async function GardenPage() {
-  const data = await getGarden();
+  const data = await getGarden(await isLoggedIn());
 
   return (
     <SiteShell>

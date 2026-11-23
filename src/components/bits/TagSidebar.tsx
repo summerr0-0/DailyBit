@@ -5,7 +5,7 @@ import { TagSidebarClient } from "./TagSidebarClient";
 type Props = { selectedTags: string[]; isLoggedIn?: boolean };
 
 export async function TagSidebar({ selectedTags, isLoggedIn = false }: Props) {
-  const [tags, stats] = await Promise.all([getTagCloud(isLoggedIn), getStats()]);
+  const [tags, stats] = await Promise.all([getTagCloud(isLoggedIn), getStats(isLoggedIn)]);
   return (
     <TagSidebarClient
       tags={tags}

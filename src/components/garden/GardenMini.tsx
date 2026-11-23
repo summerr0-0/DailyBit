@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { isLoggedIn } from "@/lib/auth";
 import { getGarden } from "@/lib/garden";
 import type { GardenLevel } from "@/lib/garden";
 
@@ -11,7 +12,7 @@ const LEVEL_CLASS: Record<GardenLevel, string> = {
 };
 
 export async function GardenMini() {
-  const data = await getGarden();
+  const data = await getGarden(await isLoggedIn());
   const recentWeeks = data.weeks.slice(-13);
 
   return (

@@ -1,3 +1,4 @@
+import { isLoggedIn } from "@/lib/auth";
 import { getGarden, getStats } from "@/lib/garden";
 import type { GardenLevel } from "@/lib/garden";
 
@@ -41,7 +42,7 @@ function monthLabelsForWeeks(
 }
 
 export async function ProfileCard() {
-  const [garden, stats] = await Promise.all([getGarden(), getStats()]);
+  const [garden, stats] = await isLoggedIn().then((owner) => Promise.all([getGarden(owner), getStats(owner)]));
   const monthLabels = monthLabelsForWeeks(garden.weeks);
 
   return (
