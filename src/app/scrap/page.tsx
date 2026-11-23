@@ -34,6 +34,9 @@ export default async function ScrapPage() {
         <p style={{ marginTop: 6, fontSize: 13.5, color: "#B4AB97" }}>
           Paste a URL (or the raw text) and let AI draft a Bit or Thread. Nothing is published until you confirm.
         </p>
+        <p style={{ marginTop: 6, fontSize: 13 }}>
+          <a href="/immigration" style={{ color: "#B07A4A" }}>Canada PR draws →</a>
+        </p>
       </header>
       <NewsInbox initialItems={newsItems} conceptItems={conceptItems} conceptStatuses={conceptStatuses} />
       <ScrapWorkbench initialDrafts={drafts} />
