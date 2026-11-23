@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getThreads, createThread } from "@/lib/threads";
-import { requireAuth } from "@/lib/auth";
+import { isLoggedIn, requireAuth } from "@/lib/auth";
 
 export async function GET() {
-  const threads = await getThreads();
+  const threads = await getThreads(await isLoggedIn());
   return NextResponse.json(threads);
 }
 

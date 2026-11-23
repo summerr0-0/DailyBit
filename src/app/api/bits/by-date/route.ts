@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getBitsByDateKST } from "@/lib/garden";
+import { isLoggedIn } from "@/lib/auth";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -9,6 +10,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "date 파라미터가 필요합니다 (yyyy-mm-dd)" }, { status: 400 });
   }
 
-  const bits = await getBitsByDateKST(date);
+  const bits = await getBitsByDateKST(date, await isLoggedIn());
   return NextResponse.json(bits);
 }
