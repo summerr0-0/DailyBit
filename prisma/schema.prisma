@@ -240,3 +240,33 @@ model ConceptEvent {
   @@index([eventKey])
   @@map("concept_events")
 }
+
+// 캐나다 영주권 선발 기록 (spec: immigration-monitor D1). 오너 전용 /immigration 화면에서만 보인다.
+// dedupeKey = sha256(program|drawDate|stream|detail) — 같은 선발을 두 번 넣지 않는다.
+model ImmigrationDraw {
+  id              String   @id @default(cuid())
+  dedupeKey       String   @unique @db.VarChar(64)
+  program         String   @db.VarChar(20)
+  stream          String   @db.VarChar(300)
+  detail          String   @default("") @db.Text
+  drawDate        DateTime @db.Date
+  minScore        Int?
+  invitations     Int?
+  invitationsText String   @default("") @db.VarChar(40)
+  sourceUrl       String
+  createdAt       DateTime @default(now())
+
+  @@index([program, drawDate])
+  @@map("immigration_draws")
+}
+
+// 공식 공지 페이지의 마지막 본문 (spec: immigration-monitor D4). 해시가 바뀌면 새 줄만 알린다.
+model PageSnapshot {
+  url       String   @id
+  hash      String   @db.VarChar(64)
+  text      String   @db.Text
+  checkedAt DateTime @default(now())
+  changedAt DateTime @default(now())
+
+  @@map("page_snapshots")
+}
