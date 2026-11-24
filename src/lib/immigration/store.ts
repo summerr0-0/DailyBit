@@ -67,7 +67,7 @@ export function createPrismaMonitorStore(): MonitorStore {
 }
 
 /** 주간 요약용 (spec: immigration-community D3·D5). 본 기사 번호는 PageSnapshot에 JSON으로 둔다 — 스키마 추가 없음 */
-export function createPrismaCommunityStore(): CommunityStore {
+export function createPrismaCommunityStore(threadTitle: string = WEEKLY_THREAD_TITLE): CommunityStore {
   return {
     async getSeen(key: string) {
       const row = await prisma.pageSnapshot.findUnique({ where: { url: key }, select: { text: true } });
@@ -81,7 +81,7 @@ export function createPrismaCommunityStore(): CommunityStore {
       }
     },
     saveSeen: (key: string, ids: string[]) => upsertSnapshot(key, "seen", JSON.stringify(ids), true),
-    postNote: privateNotePoster(WEEKLY_THREAD_TITLE),
+    postNote: privateNotePoster(threadTitle),
   };
 }
 

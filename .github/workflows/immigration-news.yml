@@ -1,21 +1,21 @@
-name: Canada PR weekly
+name: Canada PR news
 
-# 이민 기사 주간 요약 (spec: specs/immigration-community/spec.md). CN드림 이민 뉴스 → 한국어 요약 → 비공개 Bit.
-# 월요일 01:00 UTC. 원문은 저장하지 않고, 개인 정보는 AI에 보내지 않는다.
+# 이민 뉴스 요약 (spec: specs/immigration-news/spec.md). 매일 IRCC·CIC News의 관련 글, 월요일엔 CN드림 주간 요약.
+# 매일 01:30 UTC (선발 모니터 다음). 원문은 저장하지 않고, 개인 정보는 AI에 보내지 않는다.
 on:
   schedule:
-    - cron: "0 1 * * 1"
+    - cron: "30 1 * * *"
   workflow_dispatch:
 
 concurrency:
-  group: immigration-weekly
+  group: immigration-news
   cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
-  weekly:
+  news:
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 15
@@ -47,8 +47,8 @@ jobs:
           # CLI의 에러 문구(result)만 보여준다 — 예: "Failed to authenticate. API Error: 401 ..."
           echo "$out" | tail -n 1 | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);console.log(`is_error=${j.is_error} result=${String(j.result).slice(0,300)}`)}catch{console.log(s.slice(0,300))}})'
           echo "$out" | grep -q '"is_error":false' || { echo "::error::Claude CLI auth/model check failed"; exit 1; }
-      - name: Weekly digest
-        run: pnpm tsx scripts/immigration-weekly.ts
+      - name: News digest
+        run: pnpm tsx scripts/immigration-news.ts
         env:
           # Supabase Session Pooler (IPv4) — GitHub 러너는 IPv6가 없다
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
