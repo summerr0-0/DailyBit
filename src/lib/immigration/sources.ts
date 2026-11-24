@@ -30,6 +30,7 @@ export const WATCHED_PAGES = ["https://www.alberta.ca/aaip-updates"] as const;
 
 export const NOTE_TAG = "immigration";
 export const NOTE_THREAD_TITLE = "Canada PR draws";
+export const WEEKLY_THREAD_TITLE = "Canada PR weekly";
 
 /**
  * 같은 선발을 다시 넣지 않기 위한 키. EE는 공식 회차 번호(문구가 바뀌어도 그대로)를 쓰고,
