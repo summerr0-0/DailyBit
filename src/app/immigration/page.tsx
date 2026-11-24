@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { getRecentDraws, getSnapshots, type DrawRow } from "@/lib/immigration/store";
-import { SOURCES, isTechRelevant, type Program } from "@/lib/immigration/parse";
+import { SOURCES, isTechRelevant, type Program } from "@/lib/immigration/sources";
 
 // 캐나다 영주권 선발 기록 — 오너 전용 (spec: immigration-monitor R4). 방문자는 404.
 export const dynamic = "force-dynamic";

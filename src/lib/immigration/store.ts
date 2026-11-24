@@ -2,8 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { addPrivateTag } from "@/lib/privateTags";
 import { ensureDevUser } from "@/lib/bits";
 import { parseTags } from "@/lib/tags";
-import { NOTE_TAG, NOTE_THREAD_TITLE, type MonitorStore, type StoredDraw } from "./monitor";
-import type { Program } from "./parse";
+import type { MonitorStore, StoredDraw } from "./monitor";
+import { NOTE_TAG, NOTE_THREAD_TITLE, type Program } from "./sources";
 
 // MonitorStore의 Prisma 구현. 알림 Bit는 항상 private=true, 태그 #immigration도 비공개 태그로 둔다 (D5).
 

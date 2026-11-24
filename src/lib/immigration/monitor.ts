@@ -16,8 +16,8 @@ import {
 // 캐나다 영주권 선발 모니터 한 번 실행 (spec: immigration-monitor). AI 없음 — 공식 표·JSON만 읽는다.
 // 새 선발과 공지 변경은 비공개 Thread "Canada PR draws"에 비공개 Bit(#immigration)로 남긴다.
 
-export const NOTE_TAG = "immigration";
-export const NOTE_THREAD_TITLE = "Canada PR draws";
+import { NOTE_TAG } from "./sources";
+export { NOTE_TAG, NOTE_THREAD_TITLE } from "./sources";
 const NOTE_MAX = 500;
 
 export type StoredDraw = Draw & { dedupeKey: string };
