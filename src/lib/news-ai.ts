@@ -24,7 +24,7 @@ export type NewsAiClient = {
 
 // 백엔드: NEWS_AI_BACKEND=cli → Claude Code CLI(구독, API 키 불필요), 그 외 → Anthropic SDK(ANTHROPIC_API_KEY).
 let _client: NewsAiClient | null = null;
-function getClient(): NewsAiClient {
+export function getClient(): NewsAiClient {
   if (!_client) _client = process.env.NEWS_AI_BACKEND === "cli" ? createCliClient() : new Anthropic();
   return _client;
 }
@@ -43,7 +43,7 @@ function escapeDelimiters(text: string): string {
 }
 
 /** 호출 → 거부/에러 처리 → 텍스트 JSON 파싱. 실패는 null. */
-async function callJson(
+export async function callJson(
   client: NewsAiClient,
   params: Anthropic.MessageCreateParamsNonStreaming,
 ): Promise<unknown | null> {

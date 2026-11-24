@@ -3,20 +3,37 @@ import { addPrivateTag } from "@/lib/privateTags";
 import { ensureDevUser } from "@/lib/bits";
 import { parseTags } from "@/lib/tags";
 import type { MonitorStore, StoredDraw } from "./monitor";
-import { NOTE_TAG, NOTE_THREAD_TITLE, type Program } from "./sources";
+import { NOTE_TAG, NOTE_THREAD_TITLE, WATCHED_PAGES, WEEKLY_THREAD_TITLE, type Program } from "./sources";
+import type { CommunityStore } from "./community";
 
 // MonitorStore의 Prisma 구현. 알림 Bit는 항상 private=true, 태그 #immigration도 비공개 태그로 둔다 (D5).
 
-export function createPrismaMonitorStore(): MonitorStore {
+/** 비공개 Thread(제목으로 찾거나 만듦)에 비공개 Bit를 남기는 함수 — 1단계 알림과 주간 요약이 같이 쓴다 (D5) */
+function privateNotePoster(threadTitle: string) {
   let threadId: string | null = null;
+  return async (content: string) => {
+    await addPrivateTag(NOTE_TAG);
+    const author = await ensureDevUser();
+    if (!threadId) {
+      const found = await prisma.thread.findFirst({ where: { title: threadTitle, authorId: author.id }, select: { id: true } });
+      threadId = found?.id ?? (await prisma.thread.create({ data: { title: threadTitle, authorId: author.id }, select: { id: true } })).id;
+    }
+    await prisma.bit.create({
+      data: { content, tags: parseTags(content), aiCollab: "NONE", private: true, authorId: author.id, threadId },
+    });
+  };
+}
 
-  async function noteThread(authorId: string): Promise<string> {
-    if (threadId) return threadId;
-    const found = await prisma.thread.findFirst({ where: { title: NOTE_THREAD_TITLE, authorId }, select: { id: true } });
-    threadId = found?.id ?? (await prisma.thread.create({ data: { title: NOTE_THREAD_TITLE, authorId }, select: { id: true } })).id;
-    return threadId;
-  }
+async function upsertSnapshot(url: string, hash: string, text: string, changed: boolean) {
+  const now = new Date();
+  await prisma.pageSnapshot.upsert({
+    where: { url },
+    create: { url, hash, text, checkedAt: now, changedAt: now },
+    update: changed ? { hash, text, checkedAt: now, changedAt: now } : { checkedAt: now },
+  });
+}
 
+export function createPrismaMonitorStore(): MonitorStore {
   return {
     async existingKeys(program: Program) {
       const rows = await prisma.immigrationDraw.findMany({ where: { program }, select: { dedupeKey: true } });
@@ -44,29 +61,27 @@ export function createPrismaMonitorStore(): MonitorStore {
       return prisma.pageSnapshot.findUnique({ where: { url }, select: { hash: true, text: true } });
     },
 
-    async saveSnapshot(url: string, hash: string, text: string, changed: boolean) {
-      const now = new Date();
-      await prisma.pageSnapshot.upsert({
-        where: { url },
-        create: { url, hash, text, checkedAt: now, changedAt: now },
-        update: changed ? { hash, text, checkedAt: now, changedAt: now } : { checkedAt: now },
-      });
-    },
+    saveSnapshot: upsertSnapshot,
+    postNote: privateNotePoster(NOTE_THREAD_TITLE),
+  };
+}
 
-    async postNote(content: string) {
-      await addPrivateTag(NOTE_TAG);
-      const author = await ensureDevUser();
-      await prisma.bit.create({
-        data: {
-          content,
-          tags: parseTags(content),
-          aiCollab: "NONE",
-          private: true,
-          authorId: author.id,
-          threadId: await noteThread(author.id),
-        },
-      });
+/** 주간 요약용 (spec: immigration-community D3·D5). 본 기사 번호는 PageSnapshot에 JSON으로 둔다 — 스키마 추가 없음 */
+export function createPrismaCommunityStore(): CommunityStore {
+  return {
+    async getSeen(key: string) {
+      const row = await prisma.pageSnapshot.findUnique({ where: { url: key }, select: { text: true } });
+      if (!row) return null;
+      // 깨진 값이면 첫 실행처럼(14일 창) 다룬다 — 빈 목록으로 보면 옛 기사가 전부 "새 기사"가 된다 (Gemini wk #4)
+      try {
+        const ids = JSON.parse(row.text);
+        return Array.isArray(ids) ? ids.map(String) : null;
+      } catch {
+        return null;
+      }
     },
+    saveSeen: (key: string, ids: string[]) => upsertSnapshot(key, "seen", JSON.stringify(ids), true),
+    postNote: privateNotePoster(WEEKLY_THREAD_TITLE),
   };
 }
 
@@ -93,5 +108,6 @@ export async function getRecentDraws(program: Program, take = 40): Promise<DrawR
 }
 
 export async function getSnapshots(): Promise<{ url: string; checkedAt: Date; changedAt: Date }[]> {
-  return prisma.pageSnapshot.findMany({ select: { url: true, checkedAt: true, changedAt: true } });
+  // 같은 표를 쓰는 내부 기록(warning:*, community:*)은 화면에 안 보이게 감시 페이지만 (Gemini wk #5)
+  return prisma.pageSnapshot.findMany({ where: { url: { in: [...WATCHED_PAGES] } }, select: { url: true, checkedAt: true, changedAt: true } });
 }
