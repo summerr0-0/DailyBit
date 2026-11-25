@@ -29,9 +29,8 @@ export const SOURCES = {
 export const WATCHED_PAGES = ["https://www.alberta.ca/aaip-updates"] as const;
 
 export const NOTE_TAG = "immigration";
-export const NOTE_THREAD_TITLE = "Canada PR draws";
-export const WEEKLY_THREAD_TITLE = "Canada PR weekly";
-export const NEWS_THREAD_TITLE = "Canada PR news";
+/** 선발·뉴스·주간 요약이 모두 남는 비공개 Thread 하나 (spec: immigration-daily) */
+export const NOTE_THREAD_TITLE = "Canada PR";
 
 /**
  * 같은 선발을 다시 넣지 않기 위한 키. EE는 공식 회차 번호(문구가 바뀌어도 그대로)를 쓰고,

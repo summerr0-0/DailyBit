@@ -8,9 +8,16 @@ const root = join(__dirname, "../../..");
 const runtimeImports = (file: string) =>
   [...readFileSync(join(root, file), "utf8").matchAll(/^import\s+(?!type\b)[^;]*?from\s+"([^"]+)"/gm)].map((m) => m[1]);
 
-describe("/immigration page stays free of jsdom", () => {
-  it.each(["src/app/immigration/page.tsx", "src/lib/immigration/store.ts", "src/lib/immigration/sources.ts"])("%s", (file) => {
-    const bad = runtimeImports(file).filter((s) => /jsdom|immigration\/(parse|monitor)$|^\.\/(parse|monitor)$/.test(s));
+describe("/immigration and /scrap pages stay free of jsdom", () => {
+  it.each([
+    "src/app/immigration/page.tsx",
+    "src/app/scrap/page.tsx",
+    "src/components/scrap/ImmigrationBriefing.tsx",
+    "src/lib/immigration/store.ts",
+    "src/lib/immigration/sources.ts",
+    "src/lib/immigration/briefing.ts",
+  ])("%s", (file) => {
+    const bad = runtimeImports(file).filter((s) => /jsdom|immigration\/(parse|monitor|community|news-digest|daily)$|^\.\/(parse|monitor|community|news-digest|daily)$/.test(s));
     expect(bad).toEqual([]);
   });
 });
