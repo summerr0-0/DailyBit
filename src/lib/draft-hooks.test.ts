@@ -8,6 +8,7 @@ import {
   newsConceptBits,
   planConceptPublish,
   relatedNewsBit,
+  threadLink,
 } from "./draft-hooks";
 import { SITE_URL, threadUrl } from "./site-url";
 
@@ -18,12 +19,19 @@ describe("site-url", () => {
     expect(SITE_URL.endsWith("/")).toBe(false);
     expect(threadUrl("T1")).toBe(`${SITE_URL}/threads/T1`);
     expect(threadUrl("T1")).toMatch(/^https?:\/\//);
+    expect(threadUrl("T1")).not.toContain("vercel.app");
+  });
+
+  it("threadLink uses [[title]] and falls back to an absolute URL only for titles [[ ]] cannot hold", () => {
+    expect(threadLink("Finding faster  quantum algorithms", "T1")).toBe("[[Finding faster quantum algorithms]]");
+    expect(threadLink("Arrays [a|b]", "T1")).toBe(`Arrays [a|b] → ${threadUrl("T1")}`);
+    expect(threadLink("x".repeat(101), "T1")).toMatch(/… → https?:\/\//);
   });
 });
 
 describe("conceptLinkBit", () => {
   it("uses the unified one-bit-per-concept format (D14-8)", () => {
-    expect(conceptLinkBit("Quantization", "T1")).toBe(`New to this? Quantization → ${threadUrl("T1")}`);
+    expect(conceptLinkBit("Quantization", "T1")).toBe("New to this? [[Quantization]]");
   });
   it("stays within 500 chars for a huge term", () => {
     expect(conceptLinkBit("x".repeat(1000), "T1").length).toBeLessThanOrEqual(500);
@@ -60,7 +68,7 @@ describe("relatedNewsBit", () => {
     const events = [1, 2, 3, 4].map((n) => ({ title: `News ${n}`, threadId: `N${n}` }));
     const bit = relatedNewsBit(events)!;
     expect(bit).toBe(
-      `Related news:\n- News 1 → ${threadUrl("N1")}\n- News 2 → ${threadUrl("N2")}\n- News 3 → ${threadUrl("N3")}`,
+      "Related news:\n- [[News 1]]\n- [[News 2]]\n- [[News 3]]",
     );
   });
   it("stays within 500 chars with long titles", () => {
@@ -74,7 +82,7 @@ describe("planConceptPublish (R6.2)", () => {
     const plan = planConceptPublish({ term: "Quantization", threadId: "C1" }, [
       { title: "GPT-6.2 released", threadId: "N1" },
     ]);
-    expect(plan.relatedBit).toBe(`Related news:\n- GPT-6.2 released → ${threadUrl("N1")}`);
+    expect(plan.relatedBit).toBe("Related news:\n- [[GPT-6.2 released]]");
     expect(plan.backlinks).toEqual([{ threadId: "N1", content: conceptLinkBit("Quantization", "C1") }]);
   });
   it("does nothing extra when no news is published", () => {
@@ -124,5 +132,18 @@ describe("expiry (R6.5, D14-9)", () => {
   });
   it("cutoffs match the TTLs", () => {
     expect(expiryCutoffs(now)).toEqual({ news: ago(3), concept: ago(7) });
+  });
+});
+
+describe("[[title]] only when it reaches that thread", () => {
+  it("relatedNewsBit uses a URL when the caller says the title resolves elsewhere", () => {
+    expect(relatedNewsBit([{ title: "Lean", threadId: "N1", wiki: false }])).toBe(`Related news:\n- Lean → ${threadUrl("N1")}`);
+  });
+  it("planConceptPublish turns same-titled news threads into URLs", () => {
+    const plan = planConceptPublish({ term: "Lean", threadId: "C1" }, [
+      { title: "Same title", threadId: "N1" },
+      { title: "same  title", threadId: "N2" },
+    ]);
+    expect(plan.relatedBit).toBe(`Related news:\n- Same title → ${threadUrl("N1")}\n- same title → ${threadUrl("N2")}`);
   });
 });
