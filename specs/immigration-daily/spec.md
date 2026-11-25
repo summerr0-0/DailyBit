@@ -3,6 +3,7 @@
 ## Meta
 - 기획: `~/Obsidian/document/01_Projects/Job_Application_2026/Canada_PR_Monitor_Plan.md` 5-5
 - Approved by: 사용자 — "걍 비슷할때 돌면서 요약하면 안돼?" → 스레드 하나 + 실행 하나 제안에 "ㅇㅇㅇ 그렇게 해줘"(2026-11-24)
+- 추가: "일주일에 한번씩 정리되서 (알기쉽게) 알려주는거지? 이것도 /scrap 여쪽에 올려놓도록 해줘"(2026-11-24) → D6~D8
 
 ## Goal
 선발 표·뉴스·CN드림 주간 요약을 매일 한 번(한국 10시 무렵), 한 곳에서 본다.
@@ -16,6 +17,9 @@
 - **D2 스레드**: 비공개 Thread "Canada PR" 하나(`NOTE_THREAD_TITLE`).
 - **D3 머리 Bit**: 새 소식이나 실패가 있는 날만 "Canada PR — yyyy-mm-dd" 머리 Bit(단계별 한 줄)를 먼저 남기고 상세 Bit가 뒤따른다. 조용한 날은 Bit 없음(저장은 함). 표 구조 경고는 monitor가 주 1번으로 묶으므로 그것만으로는 머리 Bit를 만들지 않는다.
 - **D4 순서 보장**: 각 단계의 알림·저장을 큐에 쌓고 머리 Bit 뒤에 쌓인 순서대로 실행 — "알림 뒤에 저장"이 그대로. 하나가 실패하면 거기서 멈춘다. 단계가 예외로 멈추면 그 단계가 쌓은 것은 버리고 머리 Bit에 "실행 실패".
+- **D6 이번 주 정리**: 월요일, 그날 알림을 다 남긴 뒤 지난 7일의 선발(이번 주에 들어온 최근 선발 — 첫 실행 백필 제외)과 영주권 스레드의 비공개 Bit(머리·상태 Bit 제외)를 모은다. 아무것도 없으면 AI 없이 "조용한 주".
+- **D7 AI**: Sonnet, 쉬운 한국어(해요체) — headline 1문장, points 2~5개(무슨 일 + 개발자에게 의미), 용어 풀이 5개까지, 다음에 볼 것. 입력에 없는 사실 금지, 법률 조언 금지. 선발·알림 모두 비신뢰 블록. 개인 정보 없음.
+- **D8 보이는 곳**: `PageSnapshot` `briefing:weekly`에 JSON(스키마 추가 없음) → `/scrap`(오너 전용) 맨 위 카드. 스레드에는 "이번 주 정리 + 링크" Bit 하나. AI 실패면 저장 안 하고 exit 1.
 - **D5 실패 격리**: AI 인증 확인 단계는 `continue-on-error` — 선발 알림은 항상 돈다. 인증이 실패했으면 마지막 단계에서 job을 실패로(메일).
 
 ## Requirements
@@ -26,7 +30,11 @@
 - R5 중간에 터진 단계의 큐는 버림 / 알림 실패 시 뒤 저장 없음
 - R6 월요일 단계 실패는 머리 Bit에 표시, 다른 단계는 계속
 
+- R7 이번 주 정리: 입력(기간·tech 표시·상태 Bit 제외), 조용한 주는 AI 없이, AI 실패면 저장·알림 없음, 알림 Bit 500자 — `briefing.test.ts`
+- R8 `/scrap`과 카드가 jsdom을 끌어오지 않는다 — `no-jsdom.test.ts`
+
 ## Tasks
 - T1 `src/lib/immigration/daily.ts` + 테스트 — R1~R6
 - T2 `scripts/immigration.ts`(`--weekly`, `--dry-run`), `.github/workflows/immigration.yml` 통합 — D1, D5
 - T3 `sources.ts`/`store.ts` 스레드 제목 하나로 — D2
+- T4 `briefing.ts`(+테스트), `briefing-ai.ts`, store `createPrismaBriefingStore`·`getWeeklyBriefing`, `ImmigrationBriefing` 카드 — D6~D8

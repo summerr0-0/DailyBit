@@ -5,6 +5,7 @@ import { parseTags } from "@/lib/tags";
 import type { MonitorStore, StoredDraw } from "./monitor";
 import { NOTE_TAG, NOTE_THREAD_TITLE, WATCHED_PAGES, type Program } from "./sources";
 import type { CommunityStore } from "./community";
+import { BRIEFING_KEY, parseBriefing, type BriefingStore, type WeeklyBriefing } from "./briefing";
 
 // MonitorStore의 Prisma 구현. 알림 Bit는 항상 private=true, 태그 #immigration도 비공개 태그로 둔다 (D5).
 
@@ -110,4 +111,41 @@ export async function getRecentDraws(program: Program, take = 40): Promise<DrawR
 export async function getSnapshots(): Promise<{ url: string; checkedAt: Date; changedAt: Date }[]> {
   // 같은 표를 쓰는 내부 기록(warning:*, community:*)은 화면에 안 보이게 감시 페이지만 (Gemini wk #5)
   return prisma.pageSnapshot.findMany({ where: { url: { in: [...WATCHED_PAGES] } }, select: { url: true, checkedAt: true, changedAt: true } });
+}
+
+/** 예전 스레드 이름까지 — 합치기 전(2026-11-24)에 남은 알림도 이번 주 정리에 들어가게 */
+const PR_THREAD_TITLES = [NOTE_THREAD_TITLE, "Canada PR draws", "Canada PR news", "Canada PR weekly"];
+
+/** 이번 주 정리용 (spec: immigration-daily D6). 결과는 PageSnapshot `briefing:weekly`에 JSON — 스키마 추가 없음 */
+export function createPrismaBriefingStore(): BriefingStore {
+  return {
+    async recentDraws(since: Date) {
+      // 이번 주에 새로 들어온 최근 선발만 — 첫 실행 때 한꺼번에 넣은 옛 선발은 빠진다
+      const rows = await prisma.immigrationDraw.findMany({
+        where: { createdAt: { gte: since }, drawDate: { gte: new Date(since.getTime() - 7 * 86_400_000) } },
+        orderBy: [{ drawDate: "desc" }],
+        take: 100,
+        select: { program: true, stream: true, detail: true, drawDate: true, minScore: true, invitationsText: true },
+      });
+      return rows.map((r) => ({ ...r, program: r.program as Program, drawDate: r.drawDate.toISOString().slice(0, 10) }));
+    },
+    async recentNotes(since: Date) {
+      const author = await ensureDevUser();
+      const rows = await prisma.bit.findMany({
+        where: { authorId: author.id, private: true, createdAt: { gte: since }, thread: { title: { in: PR_THREAD_TITLES } } },
+        orderBy: { createdAt: "asc" },
+        take: 200,
+        select: { content: true },
+      });
+      return rows.map((r) => r.content);
+    },
+    saveBriefing: (b: WeeklyBriefing) => upsertSnapshot(BRIEFING_KEY, "briefing", JSON.stringify(b), true),
+    postNote: privateNotePoster(NOTE_THREAD_TITLE),
+  };
+}
+
+/** /scrap 카드용 — 가장 최근 "이번 주 정리". 없거나 깨졌으면 null */
+export async function getWeeklyBriefing(): Promise<WeeklyBriefing | null> {
+  const row = await prisma.pageSnapshot.findUnique({ where: { url: BRIEFING_KEY }, select: { text: true } });
+  return parseBriefing(row?.text);
 }

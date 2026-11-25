@@ -2,6 +2,7 @@
  * 캐나다 영주권 알림 하루 1번 (spec: specs/immigration-daily/spec.md).
  * 선발 표(EE·BC PNP·AAIP, AI 없음) → IRCC·CIC News 관련 글(AI) → 월요일엔 CN드림 주간 요약(AI).
  * 결과는 비공개 Thread "Canada PR" 하나에 "오늘 요약" 머리 Bit + 상세 Bit로. 원문 저장·개인 정보 전송 없음.
+ * 월요일엔 지난 7일을 쉬운 한국어 "이번 주 정리"로 만들어 /scrap 맨 위 카드에 보인다.
  *
  *   pnpm tsx scripts/immigration.ts             # 실행 (DB 기록)
  *   pnpm tsx scripts/immigration.ts --weekly    # 요일과 상관없이 CN드림 주간 요약도
@@ -12,6 +13,8 @@ import { FEED_TIMEOUT_MS, FEED_USER_AGENT } from "@/lib/news-feed";
 import type { CommunityStore } from "@/lib/immigration/community";
 import { summarizeArticles } from "@/lib/immigration/community-ai";
 import { runDaily } from "@/lib/immigration/daily";
+import { runWeeklyBriefing } from "@/lib/immigration/briefing";
+import { writeBriefing } from "@/lib/immigration/briefing-ai";
 import type { MonitorStore } from "@/lib/immigration/monitor";
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -57,6 +60,17 @@ async function main() {
     pause: () => new Promise((r) => setTimeout(r, 1000)), // CN드림 기사 사이 1초 — 사이트에 부담 주지 않게
   });
   console.log(JSON.stringify(result, null, 2));
+
+  // 이번 주 정리 — 오늘 알림까지 다 남긴 뒤 DB에서 지난 7일을 모은다. dry-run은 DB를 안 읽으니 건너뛴다
+  let briefingFailed = false;
+  if (weekly && store) {
+    const briefing = await runWeeklyBriefing(store.createPrismaBriefingStore(), (i) => writeBriefing(i)).catch((e) => {
+      console.error("briefing:", e);
+      return null;
+    });
+    console.log(JSON.stringify({ briefing }, null, 2));
+    briefingFailed = briefing === null;
+  } else if (weekly) console.log("[dry-run] weekly briefing skipped (needs DB)");
   if (store) await (await import("@/lib/prisma")).prisma.$disconnect();
 
   // 하나라도 못 읽었거나 AI가 실패하면 실패로 끝내 Actions 알림 메일이 가게 한다 (알림은 이미 남긴 뒤)
@@ -71,7 +85,8 @@ async function main() {
     !n ||
     n.feeds.some((f) => f.error) ||
     !n.summarized ||
-    (weekly && (!w || !w.summarized || w.listed === 0));
+    (weekly && (!w || !w.summarized || w.listed === 0)) ||
+    briefingFailed;
   if (failed) process.exit(1);
 }
 
