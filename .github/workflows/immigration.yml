@@ -44,6 +44,7 @@ jobs:
       # 인증 확인은 원인을 보여 주기만 한다 — 실패해도 선발 알림은 돌아야 하므로 막지 않는다
       # (AI가 실패하면 머리 Bit에 "AI 요약 실패"가 남고 다음 단계가 exit 1)
       - name: Check Claude CLI auth
+        id: auth
         continue-on-error: true
         run: |
           out=$(claude -p "Reply with the single word OK." --model claude-haiku-5-5 --output-format json --tools "" --strict-mcp-config --no-session-persistence 2>&1) || true
@@ -56,3 +57,9 @@ jobs:
           # Supabase Session Pooler (IPv4) — GitHub 러너는 IPv6가 없다
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NEWS_AI_BACKEND: cli
+      # 새 글이 없는 날은 AI를 부르지 않아 위 단계가 실패를 숨긴다 — 알림은 다 남긴 뒤 여기서 실패로 (Gemini daily #5)
+      - name: Fail if Claude auth failed
+        if: steps.auth.outcome == 'failure'
+        run: |
+          echo "::error::Claude CLI auth failed — draw alerts ran, AI summaries may be missing"
+          exit 1
