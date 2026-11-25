@@ -1,7 +1,8 @@
-name: Canada PR draws
+name: Canada PR
 
-# 캐나다 영주권 선발 모니터 (spec: specs/immigration-monitor/spec.md).
-# 하루 1번 01:00 UTC (밴쿠버 17:00 PST 무렵 — 그날 발표된 선발이 올라온 뒤). AI 없음, 결과는 비공개.
+# 캐나다 영주권 알림 하루 1번 (spec: specs/immigration-daily/spec.md).
+# 01:00 UTC (밴쿠버 17:00 PST 무렵 — 그날 발표된 선발이 올라온 뒤, 한국 10:00).
+# 선발 표(AI 없음) → IRCC·CIC News(AI) → 월요일엔 CN드림 주간 요약(AI). 결과는 비공개 Thread "Canada PR" 하나.
 on:
   schedule:
     - cron: "0 1 * * *"
@@ -18,7 +19,7 @@ jobs:
   monitor:
     runs-on: ubuntu-24.04
     environment: production
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -30,8 +31,28 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:generate
-      - name: Monitor
+      # AI는 Claude Code CLI로 호출 — curate와 같은 구독 토큰
+      - run: npm install -g @anthropic-ai/claude-code@2.1.328
+      # 시크릿 앞뒤 공백 제거 — 붙여넣기 때 들어간 공백으로 인증이 실패한 적이 있다. 이후 단계는 정리된 값을 쓴다.
+      - name: Normalize Claude token
+        run: |
+          token=$(printf '%s' "$RAW_TOKEN" | tr -d '[:space:]')
+          echo "::add-mask::$token"
+          echo "CLAUDE_CODE_OAUTH_TOKEN=$token" >> "$GITHUB_ENV"
+        env:
+          RAW_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      # 인증 확인은 원인을 보여 주기만 한다 — 실패해도 선발 알림은 돌아야 하므로 막지 않는다
+      # (AI가 실패하면 머리 Bit에 "AI 요약 실패"가 남고 다음 단계가 exit 1)
+      - name: Check Claude CLI auth
+        continue-on-error: true
+        run: |
+          out=$(claude -p "Reply with the single word OK." --model claude-haiku-5-5 --output-format json --tools "" --strict-mcp-config --no-session-persistence 2>&1) || true
+          # CLI의 에러 문구(result)만 보여준다 — 예: "Failed to authenticate. API Error: 401 ..."
+          echo "$out" | tail -n 1 | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);console.log(`is_error=${j.is_error} result=${String(j.result).slice(0,300)}`)}catch{console.log(s.slice(0,300))}})'
+          echo "$out" | grep -q '"is_error":false' || { echo "::error::Claude CLI auth/model check failed"; exit 1; }
+      - name: Daily digest
         run: pnpm tsx scripts/immigration.ts
         env:
           # Supabase Session Pooler (IPv4) — GitHub 러너는 IPv6가 없다
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEWS_AI_BACKEND: cli

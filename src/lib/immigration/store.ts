@@ -3,13 +3,13 @@ import { addPrivateTag } from "@/lib/privateTags";
 import { ensureDevUser } from "@/lib/bits";
 import { parseTags } from "@/lib/tags";
 import type { MonitorStore, StoredDraw } from "./monitor";
-import { NOTE_TAG, NOTE_THREAD_TITLE, WATCHED_PAGES, WEEKLY_THREAD_TITLE, type Program } from "./sources";
+import { NOTE_TAG, NOTE_THREAD_TITLE, WATCHED_PAGES, type Program } from "./sources";
 import type { CommunityStore } from "./community";
 
 // MonitorStore의 Prisma 구현. 알림 Bit는 항상 private=true, 태그 #immigration도 비공개 태그로 둔다 (D5).
 
-/** 비공개 Thread(제목으로 찾거나 만듦)에 비공개 Bit를 남기는 함수 — 1단계 알림과 주간 요약이 같이 쓴다 (D5) */
-function privateNotePoster(threadTitle: string) {
+/** 비공개 Thread(제목으로 찾거나 만듦)에 비공개 Bit를 남기는 함수 — 선발·뉴스·주간 요약이 같이 쓴다 */
+export function privateNotePoster(threadTitle: string = NOTE_THREAD_TITLE) {
   let threadId: string | null = null;
   return async (content: string) => {
     await addPrivateTag(NOTE_TAG);
@@ -67,7 +67,7 @@ export function createPrismaMonitorStore(): MonitorStore {
 }
 
 /** 주간 요약용 (spec: immigration-community D3·D5). 본 기사 번호는 PageSnapshot에 JSON으로 둔다 — 스키마 추가 없음 */
-export function createPrismaCommunityStore(threadTitle: string = WEEKLY_THREAD_TITLE): CommunityStore {
+export function createPrismaCommunityStore(threadTitle: string = NOTE_THREAD_TITLE): CommunityStore {
   return {
     async getSeen(key: string) {
       const row = await prisma.pageSnapshot.findUnique({ where: { url: key }, select: { text: true } });
