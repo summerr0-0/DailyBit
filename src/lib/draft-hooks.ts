@@ -1,4 +1,5 @@
 import { threadUrl } from "@/lib/site-url";
+import { linkKey } from "@/lib/wiki-links";
 
 // 초안 발행·폐기·만료 훅의 순수 로직 (spec: news-curation-v2 D7, D8, D10, D12, D14).
 // DB 없이 테스트하려고 scrap-drafts.ts에서 분리했다. prisma·next/* import 금지.
@@ -18,19 +19,34 @@ function clip(text: string, max: number): string {
   return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}…`;
 }
 
-/** 개념 링크 Bit — 개념 1개당 Bit 1개, 뉴스·개념 발행 어느 쪽이든 같은 모양 (D14-8). */
-export function conceptLinkBit(term: string, conceptThreadId: string): string {
-  return `New to this? ${clip(term, MAX_TERM_CHARS)} → ${threadUrl(conceptThreadId)}`;
+const WIKI_SAFE = /^[^\[\]\n|]{1,100}$/;
+
+/**
+ * 사이트 안 Thread 링크는 [[제목]]으로 (wiki-links D1). 도메인이 바뀌어도 깨지지 않고 "Linked from"에도 잡힌다.
+ * [[ ]]에 못 넣는 제목(대괄호·| 포함, 100자 초과)만 절대 URL로.
+ */
+export function threadLink(title: string, threadId: string, maxLabel = MAX_RELATED_TITLE_CHARS, wiki = true): string {
+  const t = title.replace(/\s+/g, " ").trim();
+  return wiki && WIKI_SAFE.test(t) ? `[[${t}]]` : `${clip(t, maxLabel)} → ${threadUrl(threadId)}`;
 }
 
-export type RelatedNews = { title: string; threadId: string };
+/** 개념 링크 Bit — 개념 1개당 Bit 1개, 뉴스·개념 발행 어느 쪽이든 같은 모양 (D14-8). 개념 이름은 [[ ]]로 개념 Thread에 닿는다 */
+export function conceptLinkBit(term: string, conceptThreadId: string): string {
+  return `New to this? ${threadLink(term, conceptThreadId, MAX_TERM_CHARS)}`;
+}
+
+/**
+ * title은 그 Thread의 실제 제목. wiki=false면 [[제목]]이 다른 Thread(같은 제목·개념 이름)로 풀리므로 URL로 쓴다.
+ * 호출자가 getLinkTargets로 확인해 넘긴다 (Gemini links #3).
+ */
+export type RelatedNews = { title: string; threadId: string; wiki?: boolean };
 
 /** 개념 Thread의 `Related news:` Bit. 사건이 없으면 null. 최대 3건, 500자 안에 들어가는 만큼만 (D6, D14-3). */
 export function relatedNewsBit(events: readonly RelatedNews[]): string | null {
   let content = "Related news:";
   let added = 0;
   for (const e of events.slice(0, MAX_RELATED_NEWS)) {
-    const line = `\n- ${clip(e.title, MAX_RELATED_TITLE_CHARS)} → ${threadUrl(e.threadId)}`;
+    const line = `\n- ${threadLink(e.title, e.threadId, MAX_RELATED_TITLE_CHARS, e.wiki !== false)}`;
     if (content.length + line.length > BIT_MAX_CHARS) break;
     content += line;
     added++;
@@ -85,9 +101,13 @@ export function planConceptPublish(
     if (!unique.some((u) => u.threadId === e.threadId)) unique.push(e);
     if (unique.length === MAX_RELATED_NEWS) break;
   }
+  // 같은 제목의 뉴스 Thread가 둘이면 [[제목]]은 한쪽으로만 간다 — 둘 다 URL로
+  const keyCount = new Map<string, number>();
+  for (const e of unique) keyCount.set(linkKey(e.title), (keyCount.get(linkKey(e.title)) ?? 0) + 1);
+  const events = unique.map((e) => (keyCount.get(linkKey(e.title))! > 1 ? { ...e, wiki: false } : e));
   const link = conceptLinkBit(concept.term, concept.threadId);
   return {
-    relatedBit: relatedNewsBit(unique),
+    relatedBit: relatedNewsBit(events),
     backlinks: unique.map((e) => ({ threadId: e.threadId, content: link })),
   };
 }

@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { ensureDevUser, createBit } from "@/lib/bits";
 import { createThread } from "@/lib/threads";
-import { threadUrl } from "@/lib/site-url";
+import { extractLinkKeys, linkKey, resolveLink } from "@/lib/wiki-links";
+import { getLinkTargets } from "@/lib/link-targets";
 import {
   appendSourceSegment,
   expiryCutoffs,
@@ -547,22 +548,29 @@ async function publishConceptDraft(
           select: { title: true, threadId: true },
         })
       : [];
-  // 오너가 뉴스 Thread를 지웠을 수 있다 — 남아 있는 Thread에만 링크
-  const alive = new Set(
+  // 오너가 뉴스 Thread를 지웠을 수 있다 — 남아 있는 Thread에만 링크.
+  // 링크는 [[Thread 제목]]이라 사건 제목이 아니라 Thread의 실제 제목을 쓴다
+  const alive = new Map(
     (
       await prisma.thread.findMany({
         where: { id: { in: linked.map((e) => e.threadId as string) } },
-        select: { id: true },
+        select: { id: true, title: true },
       })
-    ).map((t) => t.id),
+    ).map((t) => [t.id, t.title]),
   );
 
   const threadId = await createThreadWithBits(title, segments);
+  // [[제목]]이 정말 그 뉴스 Thread로 풀리는지 — 아니면 URL (Gemini links #3)
+  const targets = await getLinkTargets(true);
   const plan = planConceptPublish(
     { term: concept?.term ?? title, threadId },
     linked
       .filter((e) => e.threadId && alive.has(e.threadId))
-      .map((e) => ({ title: e.title, threadId: e.threadId as string })),
+      .map((e) => {
+        const id = e.threadId as string;
+        const t = alive.get(id) ?? e.title;
+        return { title: t, threadId: id, wiki: resolveLink(targets, t) === id };
+      }),
   );
   if (plan.relatedBit) await createBit({ content: plan.relatedBit, threadId, aiCollab: "LED" });
   // 뉴스 Thread에 백링크 Bit를 붙이지 않는다 — Thread 페이지의 Linked from이 대신 보여준다 (wiki-links D5)
@@ -615,10 +623,13 @@ export async function reconcileConceptLinks(eventKey: string): Promise<{ added: 
     if (!conceptThread) continue;
 
     // 뉴스 → 개념 링크는 본문 [[ ]]가 맡는다 (wiki-links D5). 개념 → 뉴스 "Related news"만 보장.
-    const newsUrl = threadUrl(newsThread.id);
+    // 이미 링크가 있나: 절대 URL(어느 도메인이든) 또는 그 Thread로 풀리는 [[제목]]
+    const newsPath = `/threads/${newsThread.id}`;
+    const newsKey = linkKey(newsThread.title);
+    const wiki = resolveLink(await getLinkTargets(true), newsThread.title) === newsThread.id;
     const conceptBits = await prisma.bit.findMany({ where: { threadId: conceptThread.id }, select: { content: true } });
-    if (!conceptBits.some((b) => b.content.includes(newsUrl))) {
-      const related = relatedNewsBit([{ title: newsThread.title, threadId: newsThread.id }]);
+    if (!conceptBits.some((b) => b.content.includes(newsPath) || (wiki && extractLinkKeys(b.content).includes(newsKey)))) {
+      const related = relatedNewsBit([{ title: newsThread.title, threadId: newsThread.id, wiki }]);
       if (related) {
         await createBit({ content: related, threadId: conceptThread.id, aiCollab: "LED" });
         added++;
